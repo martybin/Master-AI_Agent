@@ -7,6 +7,24 @@ agent is a **stateless Ollama chat workflow**, not a general autonomous agent.
 The builder itself uses Python, FastAPI and a compiled LangGraph `StateGraph`.
 There is no cloud provider dependency, tool-calling loop, vector store or memory.
 
+The local web UI is served by the same process at `/`, using bundled HTML, CSS,
+JavaScript and a local OFL-licensed Vazirmatn font. It adds durable conversations
+for the builder; it does not add runtime memory to generated agents. See
+[the chat UI guide](chat-ui.md) for the endpoint and browser session contracts.
+
+`ChatService` first requests a small `ChatDecision` structured response from
+Ollama. A conversational reply is saved directly; a build decision calls the
+same validated planner with recent messages and the previous IR. It has no n8n
+mutation methods. Revisions create new draft builds, preserving prior artifacts.
+Browser input and model output are rendered as text or a small safe Markdown
+subset; arbitrary HTML is not inserted. Owner keys are never embedded in assets.
+
+Chat uses authenticated fetch and SSE stage events, including heartbeats. The
+worker is tracked independently of the streaming response, so disconnecting a
+browser does not cancel a build. Process shutdown cancels active tasks and
+records an interrupted turn. The chat and direct-build paths share one inference
+lock. An idempotent message request ID prevents duplicate model calls after replay.
+
 ## Build pipeline
 
 1. `OllamaClient.models()` checks that the exact configured model is installed.
