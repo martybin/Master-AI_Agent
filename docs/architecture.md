@@ -2,10 +2,14 @@
 
 ## Scope
 
-This MVP turns a natural-language request into a reviewed n8n workflow. A child
-agent is a **stateless Ollama chat workflow**, not a general autonomous agent.
-The builder itself uses Python, FastAPI and a compiled LangGraph `StateGraph`.
-There is no cloud provider dependency, tool-calling loop, vector store or memory.
+Master Local Agent turns natural language into reviewed n8n workflows and can
+use owner-granted host tools. Python/FastAPI serves a local UI; the small-IR
+planner uses a compiled LangGraph `StateGraph`. A bounded chat loop discovers
+tools, observes their results and continues with the local Ollama model.
+There is no cloud provider dependency. Generated small-IR agents remain
+stateless; advanced native workflows can use installed integration/memory nodes.
+See [the local runtime contract](local-agent.md) for tools, encrypted connections,
+Telegram delivery, native schemas, access boundaries and extension points.
 
 The local web UI is served by the same process at `/`, using bundled HTML, CSS,
 JavaScript and a local OFL-licensed Vazirmatn font. It adds durable conversations
@@ -14,8 +18,10 @@ for the builder; it does not add runtime memory to generated agents. See
 
 `ChatService` first requests a small `ChatDecision` structured response from
 Ollama. A conversational reply is saved directly; a build decision calls the
-same validated planner with recent messages and the previous IR. It has no n8n
-mutation methods. Revisions create new draft builds, preserving prior artifacts.
+same validated planner with recent messages and the previous IR. A tool decision
+uses the published registry and owner grant. An explicit deploy request can
+create an inactive workflow; activation is never a chat tool. Revisions create
+new draft builds, preserving prior artifacts.
 Browser input and model output are rendered as text or a small safe Markdown
 subset; arbitrary HTML is not inserted. Owner keys are never embedded in assets.
 
@@ -32,7 +38,8 @@ lock. An idempotent message request ID prevents duplicate model calls after repl
    back to generation with structured feedback, at most `PLANNER_MAX_ATTEMPTS`.
 3. Ollama `/api/chat` receives the IR JSON Schema in `format`, temperature zero,
    a bounded context and output budget, and `think=false`. It receives no tools,
-   API keys, filesystem access or n8n client.
+   API keys, filesystem access or n8n client. This describes the small-IR planner;
+   the outer chat router separately receives tool schemas and redacted results.
 4. Pydantic rejects unknown properties and node types. Semantic validation
    rejects invalid topology, expression injection and unauthorized destinations.
 5. The pure compiler validates again and produces a deterministic n8n artifact.
@@ -85,9 +92,11 @@ Activation is a separate owner action:
    remain authoritative.
 
 `confirm:true` is an assertion by the authenticated owner. The HTTP API cannot
-prove a human was present. Keep `MASTER_API_KEY` and the activation script away
-from LLM tools and unattended callers. The interactive approval script requires
-typing a workflow-specific phrase; it is not called by the build pipeline.
+prove a human was present. Activation is not a model tool. The interactive
+approval script requires a workflow-specific phrase. A system grant permits
+arbitrary OS-user commands: code with those privileges can read owner files and
+make HTTP requests itself. The normal approval API is not an isolation boundary
+against an unrestricted local process. See the local runtime access contract.
 
 ## Ambiguous mutation results
 
@@ -101,8 +110,9 @@ remains an audit record rather than guessing a safe retry.
 
 Interrupted `deploying`, `activating` and `deactivating` states become unknown
 on process restart. SQLite `BEGIN IMMEDIATE` serializes state claims. Run exactly
-one worker and one builder process per database. This MVP does not support
-horizontal scaling, shared network filesystems or automatic migrations.
+one worker and one builder process per database. This runtime does not support
+horizontal scaling or shared network filesystems. Local-runtime tables are
+created additively, preserving existing chat/build records.
 
 ## REST routes
 
@@ -130,7 +140,7 @@ Route paths above are relative to `/api/v1`. Errors: 401 auth, 404 missing build
 from the HTTP caller's perspective; the request timeout must cover its retry
 budget. Only one inference request runs at once. There is no background job queue.
 
-## Boundaries
+## Small-IR boundaries
 
 HTTP destination allowlists match exact configured hostnames. HTTPS/443 is
 required; redirects, private literal IPs, local hostnames and userinfo are
@@ -141,7 +151,7 @@ untrusted users. The Ollama destination is a separate trusted operator setting.
 There are no credentials, arbitrary headers, Code/Execute Command/community
 nodes or raw expressions in IR. The compiler owns every generated expression
 and JSON-escapes literals. All paths use a restricted property grammar and
-reject prototype traversal. Webhooks in this MVP have no authentication; the
+reject prototype traversal. Small-IR webhooks have no authentication; the
 provided local-only n8n listener is part of the deployment scope.
 
 Local configuration and SQLite may contain sensitive prompts and outputs.

@@ -1,9 +1,9 @@
-.PHONY: setup run test test-ui check doctor n8n smoke
+.PHONY: setup run test test-ui check doctor n8n smoke smoke-local
 setup:
 	uv sync --group dev
 	uv run python scripts/bootstrap.py
 run:
-	uv run uvicorn master_agent.api:app --host 127.0.0.1 --port 8000 --workers 1
+	uv run master-local serve
 test:
 	uv run pytest -q
 test-ui:
@@ -17,3 +17,5 @@ n8n:
 	docker compose up -d n8n
 smoke:
 	uv run python scripts/smoke_ollama.py
+smoke-local:
+	uv run python scripts/smoke_local.py
