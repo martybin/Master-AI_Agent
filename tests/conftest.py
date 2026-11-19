@@ -36,11 +36,17 @@ class FakeNetwork:
         self.plan_outputs = [json.dumps(EXAMPLE)]
         self.chat_outputs = [json.dumps({"action": "build", "message": "طرح را آماده می‌کنم."})]
         self.chat_calls = 0
+        self.review_calls = 0
+        self.review_outputs = [{"status": "complete", "missing": []}]
         self.fail_create = False
         self.fail_activate = False
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         self.calls.append(request)
+        if handler := getattr(self, "extra_handler", None):
+            result = handler(request)
+            if result is not None:
+                return result
         path, method = request.url.path, request.method
         if path == "/api/tags":
             return httpx.Response(200, json={"models": [{"name": "qwen3.5:9b"}]})
@@ -52,6 +58,10 @@ class FakeNetwork:
                 content = self.chat_outputs[min(self.chat_calls, len(self.chat_outputs) - 1)]
                 self.chat_calls += 1
                 return httpx.Response(200, json={"message": {"content": content}})
+            if body["format"].get("title") == "CompletionReview":
+                content = self.review_outputs[min(self.review_calls, len(self.review_outputs) - 1)]
+                self.review_calls += 1
+                return httpx.Response(200, json={"message": {"content": json.dumps(content)}})
             index = min(
                 sum(
                     call.url.path == "/api/chat"

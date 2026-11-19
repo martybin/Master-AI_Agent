@@ -8,6 +8,7 @@ from uuid import UUID
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.staticfiles import StaticFiles
@@ -20,6 +21,12 @@ from master_agent.clients import IntegrationError, N8nClient, OllamaClient
 from master_agent.compiler import compile_ir, digest
 from master_agent.config import Settings
 from master_agent.ir import ClosedModel, WorkflowIR
+from master_agent.local.bridge import Bridges
+from master_agent.local.connectors import Connectors
+from master_agent.local.native import NativeCatalog
+from master_agent.local.routes import router as local_router
+from master_agent.local.store import LocalStore
+from master_agent.local.tools import Tools
 from master_agent.planner import Planner, PlanningFailed
 from master_agent.repository import NotFound, Repository, StateConflict
 from master_agent.service import BuildService
@@ -92,6 +99,7 @@ def create_app(
     planner_lock = asyncio.Lock()
     history = ChatRepository(repo)
     chat_tasks: set[asyncio.Task] = set()
+    turn_tasks: dict[str, asyncio.Task] = {}
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -108,15 +116,34 @@ def create_app(
             app.state.ollama, app.state.n8n = ollama, n8n
             app.state.planner = Planner(cfg, ollama)
             app.state.service = BuildService(repo, n8n)
-            app.state.chat_service = ChatService(history, ollama, app.state.planner)
+            local_store = LocalStore(
+                repo, cfg.local_vault_key or cfg.database_path.parent / "vault.key"
+            )
+            local_store.initialize()
+            local_store.sensitive_values.extend([key, cfg.n8n_api_key.get_secret_value()])
+            connectors = Connectors(local_store, client)
+            catalog = NativeCatalog(local_store)
+            catalog.initialize()
+            tools = Tools(local_store, cfg, connectors, catalog, n8n)
+            tools.load_plugins(cfg.local_plugin_modules)
+            bridges = Bridges(local_store, connectors, n8n, cfg, client)
+            app.state.local_store, app.state.connectors = local_store, connectors
+            app.state.catalog, app.state.tools, app.state.bridges = catalog, tools, bridges
+            app.state.history = history
+            app.state.chat_service = ChatService(history, ollama, app.state.planner, tools=tools)
+            resume_task = asyncio.create_task(bridges.resume())
             try:
                 yield
             finally:
                 for task in list(chat_tasks):
                     task.cancel()
                 await asyncio.gather(*chat_tasks, return_exceptions=True)
+                resume_task.cancel()
+                await asyncio.gather(resume_task, return_exceptions=True)
+                await bridges.close()
+                await connectors.close()
 
-    app = FastAPI(title="Master AI Agent Builder", version="0.2.0", lifespan=lifespan)
+    app = FastAPI(title="Master Local Agent", version="0.3.0", lifespan=lifespan)
     app.add_middleware(BodyLimit)
     bearer = HTTPBearer(auto_error=False)
 
@@ -133,6 +160,7 @@ def create_app(
             raise HTTPException(401, "Invalid API key", headers={"WWW-Authenticate": "Bearer"})
 
     auth = [Depends(authenticate)]
+    app.include_router(local_router(authenticate))
 
     web = Path(__file__).parent / "web"
     app.mount("/assets", StaticFiles(directory=web), name="assets")
@@ -159,7 +187,7 @@ def create_app(
             "model": cfg.ollama_model,
             "n8n_editor_url": cfg.n8n_base_url,
             "http_allowed_hosts": cfg.http_allowed_hosts,
-            "version": "0.2.0",
+            "version": "0.3.0",
         }
 
     @app.get("/api/v1/chats", dependencies=auth)
@@ -202,9 +230,11 @@ def create_app(
                 await request.app.state.chat_service.run(chat_id, turn["assistant"]["id"], emit)
             finally:
                 planner_lock.release()
+                turn_tasks.pop(chat_id, None)
 
         task = asyncio.create_task(process())
         chat_tasks.add(task)
+        turn_tasks[chat_id] = task
         task.add_done_callback(chat_tasks.discard)
 
         async def stream():
@@ -225,9 +255,30 @@ def create_app(
             headers={"Cache-Control": "no-cache, no-store", "X-Accel-Buffering": "no"},
         )
 
+    @app.post("/api/v1/chats/{chat_id}/cancel", dependencies=auth)
+    async def cancel_chat(chat_id: str):
+        history.get(chat_id)
+        task = turn_tasks.get(chat_id)
+        if task:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+        return history.get(chat_id)
+
     @app.exception_handler(NotFound)
     async def missing(_request: Request, exc: NotFound):
         return JSONResponse({"detail": str(exc)}, status_code=404)
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid_request(_request: Request, exc: RequestValidationError):
+        return JSONResponse(
+            {
+                "detail": [
+                    {k: v for k, v in error.items() if k in {"loc", "msg", "type"}}
+                    for error in exc.errors()
+                ]
+            },
+            status_code=422,
+        )
 
     @app.exception_handler(StateConflict)
     async def conflict(_request: Request, exc: StateConflict):

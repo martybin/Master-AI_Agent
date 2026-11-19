@@ -199,7 +199,7 @@ async def test_chat_and_old_build_api_share_inference_lock(settings, network):
     entered, release = asyncio.Event(), asyncio.Event()
     async with app.router.lifespan_context(app):
 
-        async def slow_decide(*_):
+        async def slow_decide(*_, **_kwargs):
             entered.set()
             await release.wait()
             return ChatDecision(action="reply", message="سلام")
@@ -217,7 +217,7 @@ async def test_chat_and_old_build_api_share_inference_lock(settings, network):
                     json={"content": "سلام", "request_id": str(uuid4())},
                 )
             )
-            await entered.wait()
+            await asyncio.wait_for(entered.wait(), timeout=5)
             blocked = await client.post(
                 "/api/v1/builds", json={"prompt": "Build a local assistant"}
             )

@@ -1,3 +1,5 @@
+import asyncio
+
 from master_agent.clients import IntegrationError, N8nClient
 from master_agent.compiler import create_payload, digest
 from master_agent.repository import Repository, StateConflict
@@ -17,6 +19,24 @@ def remote_snapshot(remote: dict) -> dict:
             "activeVersionId",
         )
     }
+
+
+def credential_ids(value: dict) -> dict:
+    """n8n selects credentials by ID; an optional display name is server metadata."""
+    if not isinstance(value, dict):
+        raise StateConflict("Malformed remote credential references")
+    result = {}
+    for kind, reference in value.items():
+        if (
+            not isinstance(reference, dict)
+            or set(reference) - {"id", "name"}
+            or not isinstance(reference.get("id"), str)
+            or not reference["id"]
+            or ("name" in reference and not isinstance(reference["name"], str))
+        ):
+            raise StateConflict("Unreviewed remote credential reference")
+        result[kind] = {"id": reference["id"]}
+    return result
 
 
 def verify_remote(record: dict, remote: dict) -> None:
@@ -60,6 +80,10 @@ def verify_remote(record: dict, remote: dict) -> None:
     for node in expected["nodes"]:
         actual = by_id.get(node["id"], {})
         for key, value in node.items():
+            if key == "credentials":
+                if credential_ids(actual.get(key)) != credential_ids(value):
+                    raise StateConflict("Remote credential IDs differ from the compiled draft")
+                continue
             if key not in allowed_visual and actual.get(key) != value:
                 raise StateConflict("Remote node parameters differ from the compiled draft")
         for key, value in actual.items():
@@ -83,13 +107,13 @@ class BuildService:
         self.repo.update(build_id, {"draft"}, "deploy_started", status="deploying")
         try:
             remote = await self.n8n.create_workflow(record["workflow"])
-        except IntegrationError as exc:
+        except (IntegrationError, asyncio.CancelledError) as exc:
             self.repo.update(
                 build_id,
                 {"deploying"},
                 "deploy_uncertain",
                 status="deployment_unknown",
-                last_error=exc.code,
+                last_error=getattr(exc, "code", "cancelled"),
             )
             raise
         return self.repo.update(
@@ -150,7 +174,7 @@ class BuildService:
                 or digest(remote_snapshot(remote)) != review_sha256
             ):
                 raise StateConflict("Remote workflow changed since review; review again")
-        except (IntegrationError, StateConflict):
+        except (IntegrationError, StateConflict, asyncio.CancelledError):
             self.repo.update(
                 build_id,
                 {"activating"},
@@ -171,13 +195,13 @@ class BuildService:
                 raise IntegrationError(
                     "n8n", "unexpected_activate", "n8n did not confirm activation"
                 )
-        except IntegrationError as exc:
+        except (IntegrationError, asyncio.CancelledError) as exc:
             self.repo.update(
                 build_id,
                 {"activating"},
                 "activation_uncertain",
                 status="activation_unknown",
-                last_error=exc.code,
+                last_error=getattr(exc, "code", "cancelled"),
                 review_sha256=None,
             )
             raise
@@ -199,13 +223,13 @@ class BuildService:
                 raise IntegrationError(
                     "n8n", "unexpected_deactivate", "n8n did not confirm deactivation"
                 )
-        except IntegrationError as exc:
+        except (IntegrationError, asyncio.CancelledError) as exc:
             self.repo.update(
                 build_id,
                 {"deactivating"},
                 "deactivation_uncertain",
                 status="activation_unknown",
-                last_error=exc.code,
+                last_error=getattr(exc, "code", "cancelled"),
             )
             raise
         return self.repo.update(
