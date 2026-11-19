@@ -9,3 +9,6 @@ __pycache__/
 *.egg-info/
 *.sqlite*
 .coverage
+*.key
+*.session
+*.session-journal
