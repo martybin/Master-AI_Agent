@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#191b1d" />
+    <meta
+      name="description"
+      content="با Master گفتگو کن، ایجنتت را طراحی کن و Workflow را در n8n بساز."
+    />
+    <title>Master — از ایده تا ایجنت</title>
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/app.css" />
+    <script type="module" src="/assets/app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#prompt">رفتن به نوشتن پیام</a>
+    <div class="app-shell" id="app-shell">
+      <aside class="sidebar" id="sidebar" aria-label="فضای کاری">
+        <a class="brand" href="/" aria-label="صفحهٔ آغاز Master"
+          ><span class="brand-symbol" data-icon="master"></span
+          ><span>master<span class="brand-dot">.</span></span
+          ><span class="brand-tag">LOCAL</span></a
+        >
+        <button class="new-chat" id="new-chat">
+          <span data-icon="plus"></span><span>گفتگوی تازه</span><kbd>⌘ K</kbd>
+        </button>
+        <div class="sidebar-section-label">فضای کاری</div>
+        <button class="nav-item" id="all-workflows">
+          <span data-icon="workflow"></span><span>Workflowهای من</span
+          ><span class="nav-count" id="workflow-count">—</span>
+        </button>
+        <div class="history-heading">
+          <span>گفتگوها</span
+          ><button
+            class="icon-button tiny"
+            id="toggle-search"
+            aria-label="جستجوی گفتگوها"
+            title="جستجوی گفتگوها"
+          >
+            <span data-icon="search"></span>
+          </button>
+        </div>
+        <input
+          class="history-search"
+          id="history-search"
+          placeholder="جستجو در گفتگوها…"
+          aria-label="جستجو در گفتگوها"
+          hidden
+        />
+        <nav class="chat-history" id="chat-history" aria-label="گفتگوهای اخیر">
+          <p class="history-empty">ایده‌های بعدی‌ات از اینجا شروع می‌شوند.</p>
+        </nav>
+        <div class="sidebar-bottom">
+          <div class="local-note">
+            <span data-icon="shield"></span>
+            <div>
+              <strong>تو تصمیم می‌گیری.</strong
+              ><span>ساخت و انتشار، با کنترل تو.</span>
+            </div>
+          </div>
+          <button class="nav-item" id="help-button">
+            <span data-icon="book"></span><span>راهنمای شروع</span>
+          </button>
+          <button class="profile-button" id="settings-button">
+            <span class="avatar">M</span
+            ><span class="profile-text"
+              ><strong>فضای شخصی</strong
+              ><span id="profile-state">اتصال به مدل محلی</span></span
+            ><span data-icon="settings"></span>
+          </button>
+        </div>
+      </aside>
+      <button
+        class="sidebar-scrim"
+        id="sidebar-scrim"
+        aria-label="بستن فهرست گفتگوها"
+        hidden
+      ></button>
+      <main class="workspace">
+        <header class="topbar">
+          <div class="workspace-label">
+            <button
+              class="icon-button mobile-menu"
+              id="menu-button"
+              aria-label="نمایش فهرست گفتگوها"
+            >
+              <span data-icon="menu"></span></button
+            ><span class="workspace-name">Master AI</span
+            ><span class="slash">/</span
+            ><span id="chat-title">گفتگوی تازه</span>
+          </div>
+          <div class="topbar-actions">
+            <button class="connection-button" id="connection-button">
+              <span class="status-dot" id="connection-dot"></span
+              ><span id="connection-label">اتصال به فضای کاری</span></button
+            ><span class="toolbar-divider"></span
+            ><button
+              class="icon-button"
+              id="toggle-inspector"
+              aria-label="نمایش پنل Workflow"
+              title="پنل Workflow"
+            >
+              <span data-icon="panel"></span>
+            </button>
+          </div>
+        </header>
+        <div class="conversation" id="conversation">
+          <section class="welcome" id="welcome" aria-labelledby="welcome-title">
+            <div class="welcome-mark" data-icon="master"></div>
+            <div class="eyebrow">
+              <span class="eyebrow-line"></span>از یک ایده شروع کن
+            </div>
+            <h1 id="welcome-title">
+              ایده‌ات را بگو.<br /><span>ایجنتت را بساز.</span>
+            </h1>
+            <p class="welcome-description">
+              با هم طراحی‌اش می‌کنیم؛<br class="small-break" />
+              بعد، روی n8n به جریانش می‌اندازیم.
+            </p>
+            <div class="suggestions" aria-label="ایده‌هایی برای شروع">
+              <button
+                class="suggestion"
+                data-prompt="یک دستیار فارسی بساز که پیام را با Webhook از body.message بگیرد، با Ollama پاسخ بدهد و نتیجه را به صورت JSON برگرداند."
+              >
+                <span class="suggestion-icon mint" data-icon="chat"></span
+                ><strong>یک دستیار گفتگو بساز</strong
+                ><span>پیام بگیرد و هوشمندانه جواب بدهد</span>
+              </button>
+              <button
+                class="suggestion"
+                data-prompt="یک خلاصه‌ساز فارسی بساز: متن را با Webhook POST از body.text بگیرد، با Ollama در سه جمله خلاصه کند و پاسخ JSON برگرداند."
+              >
+                <span class="suggestion-icon lilac" data-icon="text"></span
+                ><strong>متن‌ها را خلاصه کن</strong
+                ><span>متن بلند وارد شود، خلاصه بیرون بیاید</span>
+              </button>
+              <button
+                class="suggestion"
+                data-prompt="یک Workflow بساز که از Webhook POST مقدار body.kind را بگیرد؛ اگر برابر support بود پاسخ JSON با فیلد route و مقدار support بدهد و در غیر این صورت مقدار general برگرداند."
+              >
+                <span class="suggestion-icon blue" data-icon="branch"></span
+                ><strong>پیام‌ها را دسته‌بندی کن</strong
+                ><span>برای هر ورودی، یک مسیر مشخص</span>
+              </button>
+              <button
+                class="suggestion"
+                data-prompt="برای اولین تجربه یک ایجنت ساده با اجرای دستی بساز. یک متن سلام در گره تنظیم فیلد قرار بده و آن را به Ollama بفرست تا به فارسی خودش را معرفی کند."
+              >
+                <span class="suggestion-icon sand" data-icon="spark"></span
+                ><strong>از یک مثال ساده شروع کن</strong
+                ><span>یک ایجنت کوچک برای اولین تجربه</span>
+              </button>
+            </div>
+            <div class="welcome-footnote">
+              <span data-icon="cube"></span>طراحی با گفتگو <span>·</span> اجرای
+              محلی <span>·</span> انتشار با تأیید تو
+            </div>
+          </section>
+          <div
+            class="messages"
+            id="messages"
+            aria-live="polite"
+            aria-relevant="additions text"
+          ></div>
+        </div>
+        <div class="composer-area">
+          <div class="build-progress" id="build-progress" role="status" hidden>
+            <span class="spinner"></span
+            ><span id="progress-label">دارم به درخواستت فکر می‌کنم…</span
+            ><span class="elapsed" id="elapsed">۰:۰۰</span>
+          </div>
+          <form class="composer" id="composer">
+            <label class="sr-only" for="prompt"
+              >درخواستت را برای Master بنویس</label
+            >
+            <textarea
+              id="prompt"
+              rows="2"
+              maxlength="6000"
+              placeholder="دوست داری ایجنتت چه کاری انجام بدهد؟"
+              spellcheck="false"
+            ></textarea>
+            <div class="composer-toolbar">
+              <div class="composer-meta">
+                <span class="model-label"
+                  ><span data-icon="model"></span
+                  ><bdi id="model-label">Ollama · Local</bdi></span
+                ><span class="composer-separator"></span
+                ><span class="composer-hint">Enter برای ارسال</span>
+              </div>
+              <button
+                type="submit"
+                class="send-button"
+                id="send-button"
+                aria-label="ارسال پیام"
+              >
+                <span data-icon="spark"></span><span>بفرست</span>
+              </button>
+            </div>
+          </form>
+          <p class="composer-caption">
+            Master طرح را می‌سازد؛ فعال‌سازی Workflow همیشه با تأیید توست.
+          </p>
+        </div>
+      </main>
+      <aside
+        class="inspector"
+        id="inspector"
+        aria-label="پیش‌نمایش Workflow"
+        hidden
+      >
+        <header class="inspector-header">
+          <span><span data-icon="workflow"></span> Workflow</span
+          ><button
+            class="icon-button"
+            id="close-inspector"
+            aria-label="بستن پنل Workflow"
+          >
+            <span data-icon="close"></span>
+          </button>
+        </header>
+        <div id="inspector-content" class="inspector-content">
+          <div class="inspector-empty">
+            <span data-icon="workflow"></span>
+            <h2>اینجا، ایده شکل می‌گیرد.</h2>
+            <p>بعد از ساخت، گره‌ها و اتصال‌های Workflow را اینجا می‌بینی.</p>
+          </div>
+        </div>
+      </aside>
+    </div>
+    <div class="toast" id="toast" role="status" hidden></div>
+    <dialog
+      id="settings-dialog"
+      class="dialog settings-dialog"
+      aria-labelledby="settings-title"
+    >
+      <header class="dialog-header">
+        <div>
+          <span class="eyebrow">YOUR WORKSPACE</span>
+          <h2 id="settings-title">اتصال به فضای کاری</h2>
+        </div>
+        <button
+          class="icon-button"
+          data-close="settings-dialog"
+          aria-label="بستن تنظیمات"
+        >
+          <span data-icon="close"></span>
+        </button>
+      </header>
+      <p class="dialog-intro">
+        برای شروع، کلید فضای کاری‌ات را وارد کن. اتصال به Ollama و n8n از
+        تنظیمات همین پروژه خوانده می‌شود.
+      </p>
+      <form id="connection-form">
+        <label for="api-key">کلید فضای کاری <bdi>MASTER_API_KEY</bdi></label
+        ><input
+          id="api-key"
+          type="password"
+          autocomplete="off"
+          placeholder="کلید را از فایل .env پروژه کپی کن"
+          dir="ltr"
+          required
+        /><label class="check-label"
+          ><input id="remember-key" type="checkbox" /><span
+            >اتصال را تا بسته‌شدن این تب نگه دار</span
+          ></label
+        >
+        <div id="connection-error" class="form-error" role="alert" hidden></div>
+        <button
+          class="primary-button full-width"
+          id="connect-button"
+          type="submit"
+        >
+          اتصال به Master
+        </button>
+      </form>
+      <div class="service-list" id="service-list"></div>
+      <div class="dialog-footer">
+        <button class="text-button" id="refresh-system">
+          <span data-icon="refresh"></span>بررسی دوبارهٔ اتصال</button
+        ><button class="text-button" id="logout-button" hidden>
+          قطع اتصال
+        </button>
+      </div>
+    </dialog>
+    <dialog id="help-dialog" class="dialog" aria-labelledby="help-title">
+      <header class="dialog-header">
+        <h2 id="help-title">از گفتگو تا Workflow</h2>
+        <button
+          class="icon-button"
+          data-close="help-dialog"
+          aria-label="بستن راهنما"
+        >
+          <span data-icon="close"></span>
+        </button>
+      </header>
+      <div class="help-steps">
+        <article>
+          <span data-icon="chat"></span>
+          <h3>ایده‌ات را تعریف کن</h3>
+          <p>
+            بگو ورودی چیست، ایجنت چه کاری انجام بدهد و چه خروجی‌ای می‌خواهی.
+            می‌توانی با پیام بعدی طرح را تغییر بدهی.
+          </p>
+        </article>
+        <article>
+          <span data-icon="workflow"></span>
+          <h3>طرح را بررسی کن</h3>
+          <p>
+            گره‌ها، اتصال‌ها و خروجی JSON در پنل Workflow آماده می‌شوند.
+            ایجنت‌های این نسخه می‌توانند با Ollama گفتگو کنند؛ حافظه و ابزارهای
+            خارجی هنوز اضافه نشده‌اند.
+          </p>
+        </article>
+        <article>
+          <span data-icon="play"></span>
+          <h3>به n8n بفرست</h3>
+          <p>
+            پس از اتصال n8n، طرح به‌صورت غیرفعال ساخته می‌شود. بازبینی و تأیید
+            فعال‌سازی یک مرحلهٔ جداست.
+          </p>
+        </article>
+      </div>
+      <div class="help-note">
+        <strong>اتصال n8n</strong>
+        <p>
+          Docker را اجرا کن، در n8n کلید API بساز و آن را در
+          <bdi>N8N_API_KEY</bdi> فایل <bdi>.env</bdi> بگذار. سپس Master را
+          دوباره اجرا کن.
+        </p>
+        <code dir="ltr">docker compose up -d n8n</code>
+      </div>
+    </dialog>
+    <dialog
+      id="review-dialog"
+      class="dialog review-dialog"
+      aria-labelledby="review-title"
+    >
+      <header class="dialog-header">
+        <div>
+          <span class="eyebrow">FINAL REVIEW</span>
+          <h2 id="review-title">بازبینی پیش از فعال‌سازی</h2>
+        </div>
+        <button
+          class="icon-button"
+          data-close="review-dialog"
+          aria-label="بستن بازبینی"
+        >
+          <span data-icon="close"></span>
+        </button>
+      </header>
+      <div id="review-content"></div>
+      <label class="check-label approval-check"
+        ><input id="approve-check" type="checkbox" /><span
+          >طرح و مقصد درخواست‌ها را بررسی کردم و فعال‌سازی همین نسخه را تأیید
+          می‌کنم.</span
+        ></label
+      >
+      <div class="dialog-actions">
+        <button class="secondary-button" data-close="review-dialog">
+          فعلاً نه</button
+        ><button class="primary-button" id="approve-button" disabled>
+          تأیید و فعال‌سازی
+        </button>
+      </div>
+    </dialog>
+    <dialog
+      id="workflows-dialog"
+      class="dialog workflows-dialog"
+      aria-labelledby="workflows-title"
+    >
+      <header class="dialog-header">
+        <div>
+          <span class="eyebrow">YOUR BUILDS</span>
+          <h2 id="workflows-title">Workflowهای من</h2>
+        </div>
+        <button
+          class="icon-button"
+          data-close="workflows-dialog"
+          aria-label="بستن فهرست Workflowها"
+        >
+          <span data-icon="close"></span>
+        </button>
+      </header>
+      <div id="workflow-list"></div>
+    </dialog>
+    <dialog
+      id="reconcile-dialog"
+      class="dialog"
+      aria-labelledby="reconcile-title"
+    >
+      <header class="dialog-header">
+        <h2 id="reconcile-title">تطبیق وضعیت با n8n</h2>
+        <button
+          class="icon-button"
+          data-close="reconcile-dialog"
+          aria-label="بستن تطبیق وضعیت"
+        >
+          <span data-icon="close"></span>
+        </button>
+      </header>
+      <p class="dialog-intro">
+        ممکن است درخواست قبلی انجام شده باشد ولی پاسخ آن نرسیده باشد. این مرحله
+        فقط وضعیت موجود را می‌خواند.
+      </p>
+      <form id="reconcile-form">
+        <label for="remote-id">شناسهٔ Workflow در n8n</label
+        ><input
+          id="remote-id"
+          dir="ltr"
+          pattern="[a-zA-Z0-9_-]{1,80}"
+          placeholder="Workflow ID"
+        /><button class="primary-button full-width" type="submit">
+          خواندن و تطبیق وضعیت
+        </button>
+      </form>
+    </dialog>
+  </body>
+</html>

@@ -1,15 +1,21 @@
 import asyncio
+import json
 import secrets
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Annotated, Literal
+from uuid import UUID
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.staticfiles import StaticFiles
 from pydantic import Field, StrictBool
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from master_agent.chat_repository import ChatRepository
+from master_agent.chat_service import ChatService
 from master_agent.clients import IntegrationError, N8nClient, OllamaClient
 from master_agent.compiler import compile_ir, digest
 from master_agent.config import Settings
@@ -62,6 +68,11 @@ class BuildRequest(ClosedModel):
     prompt: str = Field(min_length=10, max_length=12000)
 
 
+class ChatMessageRequest(ClosedModel):
+    content: str = Field(min_length=1, max_length=6000, pattern=r"\S")
+    request_id: UUID
+
+
 class ActivationRequest(ClosedModel):
     confirm: StrictBool
     workflow_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
@@ -79,6 +90,8 @@ def create_app(
     repo = Repository(cfg.database_path)
     policy = Policy(frozenset(cfg.http_allowed_hosts))
     planner_lock = asyncio.Lock()
+    history = ChatRepository(repo)
+    chat_tasks: set[asyncio.Task] = set()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -86,6 +99,7 @@ def create_app(
         if len(key) < 32 or key == "replace-with-a-long-random-secret":
             raise RuntimeError("Generate MASTER_API_KEY first: uv run python scripts/bootstrap.py")
         repo.initialize()
+        history.initialize()
         async with httpx.AsyncClient(
             transport=transport, follow_redirects=False, trust_env=False
         ) as client:
@@ -94,9 +108,15 @@ def create_app(
             app.state.ollama, app.state.n8n = ollama, n8n
             app.state.planner = Planner(cfg, ollama)
             app.state.service = BuildService(repo, n8n)
-            yield
+            app.state.chat_service = ChatService(history, ollama, app.state.planner)
+            try:
+                yield
+            finally:
+                for task in list(chat_tasks):
+                    task.cancel()
+                await asyncio.gather(*chat_tasks, return_exceptions=True)
 
-    app = FastAPI(title="Master AI Agent Builder", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="Master AI Agent Builder", version="0.2.0", lifespan=lifespan)
     app.add_middleware(BodyLimit)
     bearer = HTTPBearer(auto_error=False)
 
@@ -113,6 +133,97 @@ def create_app(
             raise HTTPException(401, "Invalid API key", headers={"WWW-Authenticate": "Bearer"})
 
     auth = [Depends(authenticate)]
+
+    web = Path(__file__).parent / "web"
+    app.mount("/assets", StaticFiles(directory=web), name="assets")
+
+    @app.get("/", include_in_schema=False)
+    async def home():
+        return FileResponse(
+            web / "index.html",
+            headers={
+                "Cache-Control": "no-cache",
+                "Content-Security-Policy": (
+                    "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; "
+                    "img-src 'self' data:; connect-src 'self'; base-uri 'none'; "
+                    "frame-ancestors 'none'; form-action 'self'"
+                ),
+                "Referrer-Policy": "no-referrer",
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
+
+    @app.get("/api/v1/ui/config", dependencies=auth)
+    async def ui_config():
+        return {
+            "model": cfg.ollama_model,
+            "n8n_editor_url": cfg.n8n_base_url,
+            "http_allowed_hosts": cfg.http_allowed_hosts,
+            "version": "0.2.0",
+        }
+
+    @app.get("/api/v1/chats", dependencies=auth)
+    async def chats():
+        return {"chats": history.list()}
+
+    @app.post("/api/v1/chats", dependencies=auth, status_code=201)
+    async def new_chat():
+        return history.create()
+
+    @app.get("/api/v1/chats/{chat_id}", dependencies=auth)
+    async def get_chat(chat_id: str):
+        return history.get(chat_id)
+
+    @app.post("/api/v1/chats/{chat_id}/messages", dependencies=auth, response_model=None)
+    async def chat_message(chat_id: str, body: ChatMessageRequest, request: Request):
+        history.get(chat_id)
+        content = body.content.strip()
+        request_id = str(body.request_id)
+        previous = history.find_turn(chat_id, request_id, content)
+        if previous:
+            return {"replayed": True, **previous}
+        if planner_lock.locked():
+            raise HTTPException(429, "Local model is busy; retry after the current request")
+        await planner_lock.acquire()
+        try:
+            turn = history.start_turn(chat_id, request_id, content)
+        except Exception:
+            planner_lock.release()
+            raise
+        queue: asyncio.Queue = asyncio.Queue()
+        loop = asyncio.get_running_loop()
+
+        def emit(event: dict) -> None:
+            # LangGraph runs synchronous validation/compilation nodes in a thread pool.
+            loop.call_soon_threadsafe(queue.put_nowait, event)
+
+        async def process() -> None:
+            try:
+                await request.app.state.chat_service.run(chat_id, turn["assistant"]["id"], emit)
+            finally:
+                planner_lock.release()
+
+        task = asyncio.create_task(process())
+        chat_tasks.add(task)
+        task.add_done_callback(chat_tasks.discard)
+
+        async def stream():
+            yield "data: " + json.dumps({"type": "started", **turn}, ensure_ascii=False) + "\n\n"
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=15)
+                except TimeoutError:
+                    yield ": keep-alive\n\n"
+                    continue
+                yield "data: " + json.dumps(event, ensure_ascii=False) + "\n\n"
+                if event["type"] == "done":
+                    break
+
+        return StreamingResponse(
+            stream(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache, no-store", "X-Accel-Buffering": "no"},
+        )
 
     @app.exception_handler(NotFound)
     async def missing(_request: Request, exc: NotFound):
@@ -202,6 +313,10 @@ def create_app(
     @app.get("/api/v1/builds/{build_id}", dependencies=auth)
     async def get_build(build_id: str):
         return repo.get(build_id)
+
+    @app.get("/api/v1/builds", dependencies=auth)
+    async def list_builds():
+        return {"builds": repo.list_summaries()}
 
     @app.get("/api/v1/builds/{build_id}/workflow", dependencies=auth)
     async def export_workflow(build_id: str, format: Literal["import", "api"] = "import"):
