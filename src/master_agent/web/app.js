@@ -1,3 +1,4 @@
+import { mountLocalAgent } from "./local-ui.mjs";
 import {
   statuses,
   nodeKinds,
@@ -166,6 +167,7 @@ function inspector(open) {
 function setBusy(busy) {
   state.busy = busy;
   $("send-button").disabled = busy;
+  $("cancel-run").hidden = !busy;
   $("build-progress").hidden = !busy;
   clearInterval(elapsedTimer);
   if (busy) {
@@ -466,7 +468,11 @@ function renderFlow(ir) {
     glyph.append(icon((nodeKinds[node.kind] || [node.kind, "cube"])[1]));
     const info = el("div");
     info.append(
-      el("strong", "", (nodeKinds[node.kind] || [node.kind])[0]),
+      el(
+        "strong",
+        "",
+        (nodeKinds[node.kind] || [node.node_type || node.kind])[0],
+      ),
       el("small", "", nodeDetail(node)),
       el("small", "flow-node-id", node.id),
     );
@@ -487,6 +493,8 @@ function renderFlow(ir) {
   }
   for (const node of ir.nodes.filter((node) => !targets.has(node.id)))
     visit(node.id, null, null);
+  for (const node of ir.nodes)
+    if (!seen.has(node.id)) visit(node.id, null, null);
   return canvas;
 }
 function actionButton(text, task, glyph, primary = false) {
@@ -931,8 +939,11 @@ async function submit(event) {
           $("chat-title").textContent = content.slice(0, 48);
           renderMessages();
         }
-      } else if (event.type === "stage") setStage(event.stage, event.attempt);
-      else if (event.type === "complete" || event.type === "failed") {
+      } else if (event.type === "stage") {
+        setStage(event.stage, event.attempt);
+        if (event.tool)
+          $("progress-label").textContent = "در حال اجرای ابزار: " + event.tool;
+      } else if (event.type === "complete" || event.type === "failed") {
         finished = true;
         if (state.chat?.id === chatId) {
           state.chat.messages = state.chat.messages.filter(
@@ -1178,4 +1189,25 @@ async function boot() {
     logout();
   }
 }
+mountLocalAgent({
+  api,
+  state,
+  el,
+  button,
+  showDialog,
+  toast,
+  showError,
+  requireConnection,
+  refreshLists,
+  loadChat,
+});
+$("cancel-run").addEventListener("click", async () => {
+  const id = state.busyChat || state.chat?.id;
+  if (!id) return;
+  try {
+    await api(`/chats/${id}/cancel`, { method: "POST" });
+  } catch (error) {
+    showError(error);
+  }
+});
 boot();

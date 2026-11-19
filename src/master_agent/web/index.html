@@ -26,6 +26,9 @@
           <span data-icon="plus"></span><span>گفتگوی تازه</span><kbd>⌘ K</kbd>
         </button>
         <div class="sidebar-section-label">فضای کاری</div>
+        <button class="nav-item" id="local-agent-button">
+          <span data-icon="model"></span><span>Local Agent و اتصال‌ها</span>
+        </button>
         <button class="nav-item" id="all-workflows">
           <span data-icon="workflow"></span><span>Workflowهای من</span
           ><span class="nav-count" id="workflow-count">—</span>
@@ -189,6 +192,14 @@
                 ><span class="composer-separator"></span
                 ><span class="composer-hint">Enter برای ارسال</span>
               </div>
+              <button
+                type="button"
+                class="secondary-button cancel-run"
+                id="cancel-run"
+                hidden
+              >
+                توقف
+              </button>
               <button
                 type="submit"
                 class="send-button"
@@ -415,6 +426,250 @@
           خواندن و تطبیق وضعیت
         </button>
       </form>
+    </dialog>
+
+    <dialog
+      id="local-agent-dialog"
+      class="dialog local-agent-dialog"
+      aria-labelledby="local-agent-title"
+    >
+      <header class="dialog-header">
+        <div>
+          <span class="eyebrow">MASTER LOCAL AGENT</span>
+          <h2 id="local-agent-title">ابزارها و اتصال‌های محلی</h2>
+        </div>
+        <button
+          class="icon-button"
+          data-close="local-agent-dialog"
+          aria-label="بستن پنل Local Agent"
+        >
+          <span data-icon="close"></span>
+        </button>
+      </header>
+      <div class="local-tabs" id="local-tabs">
+        <button data-local-tab="access" class="active">دسترسی سیستم</button
+        ><button data-local-tab="connections">اتصال‌ها</button
+        ><button data-local-tab="automation">اجرای اتوماسیون</button
+        ><button data-local-tab="activity">گزارش فعالیت</button>
+      </div>
+      <div id="local-panel-error" class="form-error" role="alert" hidden></div>
+      <section data-local-panel="access">
+        <p class="dialog-intro">
+          برای کار با فایل‌ها یا اجرای فرمان، سطح دسترسی همین گفتگو را انتخاب
+          کن. کلیدها و ورود به حساب‌ها از بخش اتصال‌ها مدیریت می‌شوند.
+        </p>
+        <p id="local-workspace" class="service-detail"></p>
+        <form id="local-grant-form">
+          <label for="local-access-mode">سطح دسترسی</label
+          ><select id="local-access-mode">
+            <option value="off">خاموش</option>
+            <option value="workspace">فایل‌های پوشهٔ پروژه</option>
+            <option value="system">
+              دسترسی سیستم با حساب کاربر + ترمینال
+            </option></select
+          ><label class="check-label"
+            ><input type="checkbox" id="local-system-confirm" /><span
+              >اجازه می‌دهم ابزارها در این گفتگو با دسترسی حساب کاربر روی سیستم
+              اجرا شوند. این حالت یک محیط ایزوله نیست.</span
+            ></label
+          ><button class="primary-button" type="submit">
+            اعمال برای ۴ ساعت
+          </button>
+        </form>
+        <p id="local-current-grant" class="service-detail"></p>
+        <h3>ابزارهای آماده</h3>
+        <div id="local-tool-list" class="local-tool-list"></div>
+        <details class="local-advanced">
+          <summary>کاتالوگ گره‌های n8n</summary>
+          <p class="service-detail">
+            فایل خروجی دستور n8n export:nodes را در پوشهٔ پروژه قرار بده تا
+            گره‌های نصب‌شده به کاتالوگ اضافه شوند.
+          </p>
+          <form id="catalog-import-form">
+            <label for="catalog-file">مسیر فایل JSON در پروژه</label
+            ><input
+              id="catalog-file"
+              dir="ltr"
+              placeholder="work/n8n-nodes.json"
+              required
+            /><button class="secondary-button" type="submit">
+              واردکردن کاتالوگ
+            </button>
+          </form>
+          <p id="local-catalog-count" class="service-detail"></p>
+        </details>
+      </section>
+      <section data-local-panel="connections" hidden>
+        <p class="dialog-intro">
+          بات تلگرام، حساب شخصی یا یک سرویس HTTP را اضافه کن. اطلاعات حساس رمز
+          می‌شوند و به مدل فرستاده نمی‌شوند.
+        </p>
+        <div id="local-connection-list"></div>
+        <details class="local-advanced" open>
+          <summary>افزودن اتصال</summary>
+          <form id="local-connection-form" autocomplete="off">
+            <div class="local-form-grid">
+              <div>
+                <label for="connector-id">شناسهٔ اتصال (انگلیسی)</label
+                ><input
+                  id="connector-id"
+                  pattern="[a-z][a-z0-9_]{0,39}"
+                  required
+                  placeholder="telegram_support"
+                  dir="ltr"
+                />
+              </div>
+              <div>
+                <label for="connector-label">نام نمایشی</label
+                ><input id="connector-label" required placeholder="تلگرام من" />
+              </div>
+            </div>
+            <label for="connector-kind">نوع اتصال</label
+            ><select id="connector-kind">
+              <option value="telegram_bot">بات تلگرام · BotFather</option>
+              <option value="telegram_user">اکانت شخصی تلگرام</option>
+              <option value="http">API دلخواه · HTTP</option>
+            </select>
+            <div id="connector-token-fields">
+              <label for="connector-token"
+                >توکن بات یا مقدار Header احراز هویت</label
+              ><input
+                id="connector-token"
+                type="password"
+                dir="ltr"
+                autocomplete="off"
+              />
+            </div>
+            <div id="connector-user-fields" hidden>
+              <label for="connector-api-id">Telegram API ID</label
+              ><input
+                id="connector-api-id"
+                type="number"
+                min="1"
+                dir="ltr"
+              /><label for="connector-api-hash">Telegram API Hash</label
+              ><input
+                id="connector-api-hash"
+                type="password"
+                dir="ltr"
+                autocomplete="off"
+              />
+              <p class="service-detail">
+                این دو مقدار را از بخش API development tools در my.telegram.org
+                دریافت کن. ورود با شماره و کد، بعد از ثبت اتصال انجام می‌شود.
+              </p>
+            </div>
+            <div id="connector-http-fields" hidden>
+              <label for="connector-base-url">آدرس پایهٔ API</label
+              ><input
+                id="connector-base-url"
+                type="url"
+                placeholder="https://api.example.com"
+                dir="ltr"
+              /><label for="connector-header">نام Header</label
+              ><input id="connector-header" value="Authorization" dir="ltr" />
+            </div>
+            <button class="primary-button" type="submit">
+              ذخیرهٔ رمز‌شدهٔ اتصال
+            </button>
+          </form>
+        </details>
+        <section id="telegram-login-panel" class="local-login-panel" hidden>
+          <h3 id="telegram-login-title">ورود به حساب شخصی</h3>
+          <form id="telegram-phone-form">
+            <label for="telegram-phone">شماره با کد کشور</label
+            ><input
+              id="telegram-phone"
+              type="tel"
+              placeholder="+989…"
+              dir="ltr"
+              autocomplete="off"
+              required
+            /><button class="primary-button" type="submit">
+              درخواست کد ورود
+            </button>
+          </form>
+          <form id="telegram-code-form" hidden>
+            <label for="telegram-login-code">کد ورود تلگرام</label
+            ><input
+              id="telegram-login-code"
+              inputmode="numeric"
+              dir="ltr"
+              autocomplete="off"
+            />
+            <div id="telegram-password-fields" hidden>
+              <label for="telegram-login-password">رمز تأیید دومرحله‌ای</label
+              ><input
+                id="telegram-login-password"
+                type="password"
+                autocomplete="off"
+              />
+            </div>
+            <button class="primary-button" type="submit">تکمیل ورود</button>
+          </form>
+          <button class="text-button" id="telegram-cancel-login">
+            لغو ورود
+          </button>
+        </section>
+      </section>
+      <section data-local-panel="automation" hidden>
+        <p class="dialog-intro">
+          ابتدا Workflow را در پنل کناری بساز، به n8n بفرست و پس از بازبینی فعال
+          کن. سپس آن را به اتصال تلگرام وصل کن.
+        </p>
+        <div id="local-binding-list"></div>
+        <form id="local-binding-form">
+          <label for="binding-connection">اتصال تلگرام</label
+          ><select id="binding-connection" required></select
+          ><label for="binding-build">Workflow ساخته‌شده</label
+          ><select id="binding-build" required></select
+          ><label for="binding-chats"
+            >شناسهٔ گفتگوهای مجاز (با کاما جدا کن)</label
+          ><input
+            id="binding-chats"
+            placeholder="123456, -100123456789"
+            dir="ltr"
+          />
+          <p class="service-detail">
+            برای حساب شخصی انتخاب گفتگو ضروری است. برای بات، خالی‌گذاشتن یعنی
+            همهٔ گفتگوهای بات.
+          </p>
+          <button class="text-button" type="button" id="load-telegram-dialogs">
+            نمایش گفتگوهای اکانت شخصی
+          </button>
+          <div id="telegram-dialog-list"></div>
+          <label for="binding-reply-path">مسیر متن پاسخ در خروجی Workflow</label
+          ><input
+            id="binding-reply-path"
+            value="message.content"
+            dir="ltr"
+          /><button class="primary-button" type="submit">
+            ثبت اتصال به Workflow
+          </button>
+        </form>
+        <label class="check-label"
+          ><input type="checkbox" id="binding-start-confirm" /><span
+            >شروع پردازش خودکار پیام‌ها و ارسال پاسخ در گفتگوهای انتخاب‌شده را
+            تأیید می‌کنم.</span
+          ></label
+        >
+        <p class="service-detail">
+          اولین شروع حساب شخصی از پیام‌های جدید ادامه می‌دهد؛ تاریخچهٔ قدیمی
+          خودکار پردازش نمی‌شود.
+        </p>
+      </section>
+      <section data-local-panel="activity" hidden>
+        <p class="dialog-intro">
+          فعالیت ابزارها و وضعیت تحویل پیام‌ها ثبت می‌شود. نتیجهٔ نامشخص دوباره
+          به‌صورت خودکار ارسال نمی‌شود.
+        </p>
+        <div id="local-inbox"></div>
+        <div id="local-audit"></div>
+      </section>
+      <footer class="dialog-footer">
+        <button class="text-button" id="local-refresh">تازه‌کردن وضعیت</button
+        ><span class="service-detail">کلیدهای اصلی در اختیار مدل نیستند.</span>
+      </footer>
     </dialog>
   </body>
 </html>

@@ -2081,3 +2081,145 @@ textarea:focus-visible {
 .flow-node > div {
   min-width: 0;
 }
+.local-agent-dialog {
+  width: min(790px, calc(100vw - 28px));
+}
+.local-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid #415247;
+  margin-bottom: 20px;
+  padding-bottom: 9px;
+}
+.local-tabs button {
+  font-size: 14px;
+  color: #9cb4a5;
+  padding: 6px 12px;
+  border-radius: 7px;
+}
+.local-tabs button.active {
+  background: #3b5143;
+  color: #dbecdf;
+}
+.local-agent-dialog select {
+  font: inherit;
+  display: block;
+  width: 100%;
+  color: #e2ece5;
+  background: #1b241e;
+  border: 1px solid #536958;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 13px;
+}
+.local-agent-dialog form {
+  margin: 16px 0;
+}
+.local-agent-dialog form > .primary-button,
+.local-agent-dialog form > .secondary-button {
+  margin-top: 15px;
+}
+.local-agent-dialog h3 {
+  font-size: 15px;
+  font-weight: 500;
+  margin: 22px 0 11px;
+}
+.local-tool-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+.local-tool {
+  border: 1px solid #3d5142;
+  border-radius: 7px;
+  padding: 9px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.local-tool strong {
+  font:
+    12px/1.7 ui-monospace,
+    monospace;
+  direction: ltr;
+  text-align: right;
+  color: #bdd7c4;
+}
+.local-tool span {
+  font-size: 12px;
+  color: #91aa9b;
+}
+.local-connection-card {
+  background: #1e2b22;
+  border: 1px solid #3f5546;
+  border-radius: 10px;
+  padding: 15px;
+  margin: 12px 0;
+}
+.local-connection-card strong {
+  font-size: 15px;
+  font-weight: 500;
+}
+.local-row-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.local-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.local-agent-dialog label:not(.check-label) {
+  margin-top: 13px;
+}
+.local-advanced {
+  margin: 22px 0;
+  border: 1px solid #415847;
+  border-radius: 10px;
+  padding: 14px;
+}
+.local-advanced summary {
+  font-size: 14px;
+  color: #b7d8c3;
+  cursor: pointer;
+}
+.local-login-panel {
+  padding: 16px;
+  border: 1px solid #637d68;
+  border-radius: 9px;
+  background: #2b3c30;
+}
+#telegram-dialog-list {
+  max-height: 250px;
+  overflow: auto;
+}
+.cancel-run {
+  font-size: 12px;
+  min-height: 32px;
+  padding: 4px 11px;
+  border-color: #80614e;
+  color: #e2c0aa;
+}
+.local-agent-dialog input:not([type="checkbox"]) {
+  min-width: 0;
+}
+.local-agent-dialog .service-detail {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+@media (max-width: 600px) {
+  .local-tool-list,
+  .local-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .local-tabs button {
+    font-size: 12px;
+    padding: 5px 8px;
+  }
+  .local-agent-dialog {
+    padding: 18px;
+  }
+}

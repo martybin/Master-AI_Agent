@@ -19,12 +19,18 @@ export const nodeKinds = {
   respond: ["برگرداندن پاسخ", "check"],
 };
 export const stageLabels = {
+  checking_tools: "در حال بررسی نتیجهٔ کارها…",
+  tool_running: "در حال اجرای ابزار محلی…",
   thinking: "دارم به درخواستت فکر می‌کنم…",
   planning: "در حال طراحی Workflow با مدل محلی…",
   validating: "دارم گره‌ها و اتصال‌ها را بررسی می‌کنم…",
   compiling: "در حال آماده‌کردن Workflow برای n8n…",
 };
 export const warningLabels = {
+  telegram_bridge:
+    "پس از بازبینی و فعال‌سازی، این طرح را از پنل Local Agent به اتصال تلگرام وصل کن.",
+  native_workflow:
+    "گره‌ها، کد و عبارت‌ها را در n8n بررسی و آزمایش کن؛ اعتبار ساختاری به‌تنهایی اجرای درست را تضمین نمی‌کند.",
   webhook_public:
     "این Webhook احراز هویت ندارد؛ پیکربندی فعلی برای استفادهٔ محلی است.",
   ollama_result: "متن خروجی مدل در message.content قرار می‌گیرد.",
@@ -71,6 +77,7 @@ export class EventParser {
   }
 }
 export function nodeDetail(node) {
+  if (node.kind === "native") return node.node_type;
   if (node.kind === "webhook") return `${node.method} / ${node.path}`;
   if (node.kind === "schedule") return `فاصلهٔ دقیقه‌ای: ${node.every_minutes}`;
   if (node.kind === "ollama_chat") return `ورودی: ${node.input_path}`;
