@@ -34,6 +34,8 @@ class FakeNetwork:
         self.calls = []
         self.remote = None
         self.plan_outputs = [json.dumps(EXAMPLE)]
+        self.chat_outputs = [json.dumps({"action": "build", "message": "طرح را آماده می‌کنم."})]
+        self.chat_calls = 0
         self.fail_create = False
         self.fail_activate = False
 
@@ -46,8 +48,17 @@ class FakeNetwork:
             body = json.loads(request.content)
             assert body["stream"] is False and body["think"] is False
             assert body["format"]["type"] == "object"
+            if body["format"].get("title") == "ChatDecision":
+                content = self.chat_outputs[min(self.chat_calls, len(self.chat_outputs) - 1)]
+                self.chat_calls += 1
+                return httpx.Response(200, json={"message": {"content": content}})
             index = min(
-                sum(call.url.path == "/api/chat" for call in self.calls) - 1,
+                sum(
+                    call.url.path == "/api/chat"
+                    and json.loads(call.content)["format"].get("title") == "WorkflowIR"
+                    for call in self.calls
+                )
+                - 1,
                 len(self.plan_outputs) - 1,
             )
             return httpx.Response(200, json={"message": {"content": self.plan_outputs[index]}})
