@@ -1,0 +1,11 @@
+{
+  "ir_version": "1.0", "name": "Manual local assistant",
+  "nodes": [
+    {"id": "start", "kind": "manual"},
+    {"id": "input", "kind": "set", "assignments": [
+      {"name": "message", "value": {"kind": "literal", "value": "سلام، خودت را معرفی کن."}, "value_type": "string"}
+    ]},
+    {"id": "answer", "kind": "ollama_chat", "system_prompt": "به فارسی پاسخ بده.", "input_path": "message"}
+  ],
+  "edges": [{"source": "start", "target": "input"}, {"source": "input", "target": "answer"}]
+}

@@ -1,0 +1,14 @@
+{
+  "ir_version": "1.0",
+  "name": "دستیار فارسی محلی",
+  "description": "Stateless local assistant powered by Qwen on Ollama",
+  "nodes": [
+    {"id": "start", "kind": "webhook", "path": "persian-assistant", "method": "POST"},
+    {"id": "answer", "kind": "ollama_chat", "system_prompt": "به فارسی، کوتاه و دقیق پاسخ بده.", "input_path": "body.message"},
+    {"id": "reply", "kind": "respond", "status_code": 200}
+  ],
+  "edges": [
+    {"source": "start", "target": "answer", "port": "main"},
+    {"source": "answer", "target": "reply", "port": "main"}
+  ]
+}
