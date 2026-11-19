@@ -1,0 +1,497 @@
+{
+  "$defs": {
+    "Assignment": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "pattern": "^[a-z][a-z0-9_]{0,39}$",
+          "title": "Name",
+          "type": "string"
+        },
+        "value": {
+          "discriminator": {
+            "mapping": {
+              "input": "#/$defs/InputValue",
+              "literal": "#/$defs/LiteralValue"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/LiteralValue"
+            },
+            {
+              "$ref": "#/$defs/InputValue"
+            }
+          ],
+          "title": "Value"
+        },
+        "value_type": {
+          "default": "string",
+          "enum": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "title": "Value Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "title": "Assignment",
+      "type": "object"
+    },
+    "Edge": {
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "pattern": "^[a-z][a-z0-9_]{0,39}$",
+          "title": "Source",
+          "type": "string"
+        },
+        "target": {
+          "pattern": "^[a-z][a-z0-9_]{0,39}$",
+          "title": "Target",
+          "type": "string"
+        },
+        "port": {
+          "default": "main",
+          "enum": [
+            "main",
+            "true",
+            "false"
+          ],
+          "title": "Port",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "target"
+      ],
+      "title": "Edge",
+      "type": "object"
+    },
+    "HttpNode": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z][a-z0-9_]{0,39}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "http_request",
+          "title": "Kind",
+          "type": "string"
+        },
+        "method": {
+          "default": "GET",
+          "enum": [
+            "GET",
+            "POST"
+          ],
+          "title": "Method",
+          "type": "string"
+        },
+        "url": {
+          "maxLength": 2048,
+          "title": "Url",
+          "type": "string"
+        },
+        "body": {
+          "maxProperties": 20,
+          "patternProperties": {
+            "^[a-z][a-z0-9_]{0,39}$": {
+              "discriminator": {
+                "mapping": {
+                  "input": "#/$defs/InputValue",
+                  "literal": "#/$defs/LiteralValue"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/LiteralValue"
+                },
+                {
+                  "$ref": "#/$defs/InputValue"
+                }
+              ]
+            }
+          },
+          "title": "Body",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "url"
+      ],
+      "title": "HttpNode",
+      "type": "object"
+    },
+    "IfNode": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z][a-z0-9_]{0,39}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "if_equals",
+          "title": "Kind",
+          "type": "string"
+        },
+        "input_path": {
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*){0,7}$",
+          "title": "Input Path",
+          "type": "string"
+        },
+        "equals": {
+          "maxLength": 1000,
+          "title": "Equals",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "input_path",
+        "equals"
+      ],
+      "title": "IfNode",
+      "type": "object"
+    },
+    "InputValue": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "input",
+          "default": "input",
+          "title": "Kind",
+          "type": "string"
+        },
+        "path": {
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*){0,7}$",
+          "title": "Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "title": "InputValue",
+      "type": "object"
+    },
+    "LiteralValue": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "literal",
+          "default": "literal",
+          "title": "Kind",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "LiteralValue",
+      "type": "object"
+    },
+    "ManualNode": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z][a-z0-9_]{0,39}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "manual",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ],
+      "title": "ManualNode",
+      "type": "object"
+    },
+    "OllamaNode": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z][a-z0-9_]{0,39}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "ollama_chat",
+          "title": "Kind",
+          "type": "string"
+        },
+        "system_prompt": {
+          "maxLength": 6000,
+          "minLength": 1,
+          "title": "System Prompt",
+          "type": "string"
+        },
+        "input_path": {
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*){0,7}$",
+          "title": "Input Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "system_prompt",
+        "input_path"
+      ],
+      "title": "OllamaNode",
+      "type": "object"
+    },
+    "RespondNode": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z][a-z0-9_]{0,39}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "respond",
+          "title": "Kind",
+          "type": "string"
+        },
+        "status_code": {
+          "default": 200,
+          "enum": [
+            200,
+            201,
+            202,
+            400
+          ],
+          "title": "Status Code",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ],
+      "title": "RespondNode",
+      "type": "object"
+    },
+    "ScheduleNode": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z][a-z0-9_]{0,39}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "schedule",
+          "title": "Kind",
+          "type": "string"
+        },
+        "every_minutes": {
+          "maximum": 59,
+          "minimum": 1,
+          "title": "Every Minutes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "every_minutes"
+      ],
+      "title": "ScheduleNode",
+      "type": "object"
+    },
+    "SetNode": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z][a-z0-9_]{0,39}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "set",
+          "title": "Kind",
+          "type": "string"
+        },
+        "assignments": {
+          "items": {
+            "$ref": "#/$defs/Assignment"
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "title": "Assignments",
+          "type": "array"
+        },
+        "include_input": {
+          "default": true,
+          "title": "Include Input",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "assignments"
+      ],
+      "title": "SetNode",
+      "type": "object"
+    },
+    "WebhookNode": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z][a-z0-9_]{0,39}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "webhook",
+          "title": "Kind",
+          "type": "string"
+        },
+        "path": {
+          "pattern": "^[a-z0-9][a-z0-9/-]{0,79}$",
+          "title": "Path",
+          "type": "string"
+        },
+        "method": {
+          "default": "POST",
+          "enum": [
+            "GET",
+            "POST"
+          ],
+          "title": "Method",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "path"
+      ],
+      "title": "WebhookNode",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "ir_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Ir Version",
+      "type": "string"
+    },
+    "name": {
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "description": {
+      "default": "",
+      "maxLength": 2000,
+      "title": "Description",
+      "type": "string"
+    },
+    "nodes": {
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "http_request": "#/$defs/HttpNode",
+            "if_equals": "#/$defs/IfNode",
+            "manual": "#/$defs/ManualNode",
+            "ollama_chat": "#/$defs/OllamaNode",
+            "respond": "#/$defs/RespondNode",
+            "schedule": "#/$defs/ScheduleNode",
+            "set": "#/$defs/SetNode",
+            "webhook": "#/$defs/WebhookNode"
+          },
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/ManualNode"
+          },
+          {
+            "$ref": "#/$defs/WebhookNode"
+          },
+          {
+            "$ref": "#/$defs/ScheduleNode"
+          },
+          {
+            "$ref": "#/$defs/SetNode"
+          },
+          {
+            "$ref": "#/$defs/HttpNode"
+          },
+          {
+            "$ref": "#/$defs/OllamaNode"
+          },
+          {
+            "$ref": "#/$defs/IfNode"
+          },
+          {
+            "$ref": "#/$defs/RespondNode"
+          }
+        ]
+      },
+      "maxItems": 20,
+      "minItems": 2,
+      "title": "Nodes",
+      "type": "array"
+    },
+    "edges": {
+      "items": {
+        "$ref": "#/$defs/Edge"
+      },
+      "maxItems": 25,
+      "minItems": 1,
+      "title": "Edges",
+      "type": "array"
+    }
+  },
+  "required": [
+    "name",
+    "nodes",
+    "edges"
+  ],
+  "title": "WorkflowIR",
+  "type": "object"
+}
