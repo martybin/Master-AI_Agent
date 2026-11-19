@@ -99,6 +99,23 @@ class Repository:
             raise NotFound("Build not found")
         return json.loads(row[0])
 
+    def list_summaries(self) -> list[dict]:
+        with self.connect() as db:
+            rows = db.execute(
+                "SELECT data FROM builds ORDER BY json_extract(data,'$.updated_at') DESC LIMIT 100"
+            ).fetchall()
+        return [
+            {
+                "id": record["id"],
+                "name": record["ir"]["name"],
+                "status": record["status"],
+                "node_count": len(record["ir"]["nodes"]),
+                "updated_at": record["updated_at"],
+            }
+            for row in rows
+            if (record := json.loads(row[0]))
+        ]
+
     def update(
         self,
         build_id: str,

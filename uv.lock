@@ -404,11 +404,12 @@ wheels = [
 
 [[package]]
 name = "master-ai-agent-builder"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "httpx" },
+    { name = "langchain-core" },
     { name = "langgraph" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
@@ -426,6 +427,7 @@ dev = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.121,<1" },
     { name = "httpx", specifier = ">=0.28,<1" },
+    { name = "langchain-core", specifier = ">=1,<2" },
     { name = "langgraph", specifier = ">=1.0,<2" },
     { name = "pydantic", specifier = ">=2.12,<3" },
     { name = "pydantic-settings", specifier = ">=2.11,<3" },

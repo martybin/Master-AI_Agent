@@ -30,21 +30,27 @@ class OllamaClient:
                 "ollama", "unavailable", "Cannot read Ollama model inventory"
             ) from exc
 
-    async def generate(self, messages: list[dict[str, str]]) -> str:
+    async def generate(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        schema: dict | None = None,
+        num_predict: int | None = None,
+    ) -> str:
         try:
             response = await self.client.post(
                 self.settings.ollama_base_url + "/api/chat",
                 json={
                     "model": self.settings.ollama_model,
                     "messages": messages,
-                    "format": WorkflowIR.model_json_schema(),
+                    "format": schema or WorkflowIR.model_json_schema(),
                     "stream": False,
                     "think": False,
                     "options": {
                         "temperature": 0,
                         "seed": 42,
                         "num_ctx": self.settings.ollama_num_ctx,
-                        "num_predict": self.settings.ollama_num_predict,
+                        "num_predict": num_predict or self.settings.ollama_num_predict,
                     },
                 },
                 timeout=self.settings.ollama_timeout_seconds,
