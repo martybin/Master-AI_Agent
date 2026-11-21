@@ -131,6 +131,40 @@ flood limits, dialog access and bot privacy settings still apply.
 
 ## Delivery and recovery
 
+### Planning birthdays for personal contacts
+
+A request to congratulate personal Telegram contacts on their birthdays first
+checks real connection prerequisites. With no personal account, an unfinished
+login, or no birthday source, the chat returns an initial design and specific
+setup/data questions. It does not keep listing the same empty connections.
+Passwords and codes still belong in the Connections panel.
+
+The suggested design is a daily date check, selection of today's recipients,
+per-contact/year deduplication, then sending and recording the outcome. This
+planning check does **not** create or enable a scheduled birthday sender.
+Dates, calendar/timezone, send time and an actual outbound integration must be
+specified and implemented/reviewed before activation. The existing incoming
+text-reply template is excluded from these requests; it would not implement
+the requested job.
+
+Bot credentials do not grant personal-account contact access. Telegram birthday
+visibility depends on the contact's privacy settings; missing dates cannot be
+inferred. The official [profile API](https://core.telegram.org/api/profile)
+describes available birthday information and a nearby-birthday query, not a
+complete database of every contact's birthday. An owner-supplied CSV/JSON can
+provide dates that the owner already has; confirm its calendar before use.
+
+### Repeated reads
+
+Within a chat turn, identical successful read-only tool calls are remembered.
+A duplicate reuses the previous evidence without a second external read, and
+the model gets one correction opportunity. Repeating the same read again ends
+with a specific loop diagnostic instead of exhausting the entire step budget.
+Successful writes/commands invalidate the read history, allowing a fresh read
+after a real change. The overall step budget still applies to distinct calls.
+
+### Message delivery
+
 The inbox encrypts payload/reply, deduplicates event IDs and durably captures
 before advancing polling offsets. Only one delivery claim can run at a time.
 Known pending deliveries resume automatically. Unknown outcomes do not.
