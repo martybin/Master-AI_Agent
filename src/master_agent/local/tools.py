@@ -181,8 +181,8 @@ class Tools:
             ),
             (
                 "workflow.telegram_assistant",
-                "Build a real Telegram bot/personal automation draft for a configured "
-                "connection; binding/listener requires owner activation",
+                "Build an INCOMING TEXT REPLY Telegram bot/personal draft; NOT scheduled "
+                "outbound/birthday/contact automation. Binding requires owner activation.",
                 TelegramBuildArgs,
                 "none",
                 self.telegram_workflow,

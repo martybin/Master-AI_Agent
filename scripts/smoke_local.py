@@ -66,6 +66,27 @@ async def smoke(root):
             assert {"system.inspect", "files.write", "files.read"} <= completed
             print("PASS: inspected, wrote and read the actual file", flush=True)
 
+            chat = (await client.post("/api/v1/chats")).json()["id"]
+            result = await turn(
+                client,
+                chat,
+                "خب میخام که برام یه اتوماسیون تلگرام طراحی کنی که بتونم بیام و به تمام "
+                "کانتکتام روز تولدشون تبریک ارسال کنم",
+            )
+            assert result["build"] is None
+            assert "اکانت شخصی" in result["message"]["content"]
+            assert "CSV/JSON" in result["message"]["content"]
+            assert "تعداد مراحل" not in result["message"]["content"]
+            calls = [
+                e
+                for e in app.state.local_store.audits()
+                if e.get("chat_id") == chat and e["action"] == "tool.start"
+            ]
+            assert [e["tool"] for e in calls] == ["connections.list"]
+            print(
+                "PASS: contact birthday prerequisites return once, without a tool loop", flush=True
+            )
+
             for kind in ["telegram_bot", "telegram_user"]:
                 alias = "smoke_" + kind
                 response = await client.post(

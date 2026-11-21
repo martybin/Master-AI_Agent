@@ -12,6 +12,11 @@ from master_agent.chat_repository import ChatRepository
 from master_agent.clients import IntegrationError, OllamaClient
 from master_agent.compiler import digest
 from master_agent.ir import ClosedModel
+from master_agent.local.chat_policy import (
+    READ_ONLY_TOOLS,
+    connection_guidance,
+    personal_birthday_request,
+)
 from master_agent.planner import Planner, PlanningFailed
 
 logger = logging.getLogger(__name__)
@@ -59,7 +64,7 @@ class ChatService:
             "the small stateless IR described below. NEVER choose build for Telegram, "
             "personal accounts, bots, or other integrations beyond the small IR, even if "
             "the owner asks only for a draft. For these choose action=tool: first "
-            "connections.list, then workflow.telegram_assistant for Telegram or the "
+            "connections.list, then choose a tool that actually matches the request or the "
             "native catalog for other integrations. Choose action=build for "
             "an explicit, "
             "sufficiently specified request to create or revise a supported "
@@ -111,8 +116,16 @@ class ChatService:
                 "passwords or login codes in chat: use the Local Agent connections panel. "
                 "Discover node schemas with catalog.search/describe, then "
                 "workflow.create_native "
-                "for advanced n8n workflows. For Telegram, call connections.list then "
-                "workflow.telegram_assistant with the chosen bot/user connection id. If "
+                "for advanced n8n workflows. For incoming Telegram chat replies, call "
+                "connections.list then workflow.telegram_assistant with the chosen bot/user "
+                "connection id. That template ONLY replies to incoming text: it cannot "
+                "schedule outbound birthday greetings, enumerate contacts or discover "
+                "birthdays. For scheduled/outbound tasks first clarify the birthday data "
+                "source, account type and schedule; then design an appropriate native "
+                "workflow/runtime integration. Never replace such tasks with the incoming "
+                "chat template. Do not claim contacts or birthdays were retrieved without "
+                "tool evidence. A bot cannot enumerate a personal account's contacts; "
+                "hidden/unset birthdays cannot be inferred. If "
                 "none is "
                 "configured, explain how to add one in Local Agent. Both Telegram "
                 "account types "
@@ -145,6 +158,21 @@ class ChatService:
                     }
                 )
         schema = ChatDecision.model_json_schema()
+        birthday_task = self.tools is not None and personal_birthday_request(
+            messages[-1]["content"]
+        )
+        if birthday_task:
+            schema["properties"]["action"]["enum"] = ["reply", "tool"]
+            schema["properties"]["tool_name"] = {
+                "enum": [
+                    None,
+                    *[
+                        entry["name"]
+                        for entry in self.tools.manifest()
+                        if entry["name"] != "workflow.telegram_assistant"
+                    ],
+                ]
+            }
         if force_tool:
             schema["properties"]["action"]["enum"] = ["tool"]
             turns[0]["content"] += (
@@ -160,6 +188,19 @@ class ChatService:
             )
             try:
                 decision = ChatDecision.model_validate_json(raw)
+                if birthday_task and (
+                    decision.action == "build"
+                    or decision.tool_name == "workflow.telegram_assistant"
+                ):
+                    turns.append(
+                        {
+                            "role": "user",
+                            "content": "The incoming reply/small-IR template cannot "
+                            "satisfy scheduled contact birthdays. Use a matching native design "
+                            "or ask about missing inputs; do not create an unrelated workflow.",
+                        }
+                    )
+                    continue
                 if force_tool and decision.action != "tool":
                     turns.append({"role": "user", "content": "Call the required remaining tool."})
                     continue
@@ -227,9 +268,26 @@ class ChatService:
             )
             previous_ir = self.history.builds.get(latest_build)["ir"] if latest_build else None
             observations = []
+            read_results = set()
+            repeated_reads = set()
             tool_build = None
             force_tool = False
-            for step in range(self.planner.settings.local_max_steps):
+            initial_steps = 0
+            # Personal-contact birthdays have mandatory inputs; surface them even
+            # when a small model would repeatedly rediscover the empty registry.
+            if self.tools and personal_birthday_request(messages[-1]["content"]):
+                emit({"type": "stage", "stage": "tool_running", "tool": "connections.list"})
+                connections = await self.tools.call(chat_id, "connections.list", {})
+                emit({"type": "tool", "name": "connections.list", "status": "complete"})
+                observations.append({"tool": "connections.list", "result": connections})
+                read_results.add(("connections.list", "{}"))
+                initial_steps = 1
+                guidance = connection_guidance(messages[-1]["content"], connections)
+                if guidance:
+                    message = self.history.finish_turn(chat_id, assistant_id, guidance)
+                    emit({"type": "complete", "message": message, "build": None})
+                    return
+            for step in range(initial_steps, self.planner.settings.local_max_steps):
                 decision = await self.decide(
                     messages,
                     previous_ir,
@@ -254,6 +312,42 @@ class ChatService:
                     break
                 if not self.tools:
                     raise PlanningFailed([{"code": "tool_unavailable", "message": "No runtime"}], 1)
+                signature = (
+                    decision.tool_name,
+                    json.dumps(decision.tool_arguments, sort_keys=True, ensure_ascii=False),
+                )
+                if decision.tool_name in READ_ONLY_TOOLS and signature in read_results:
+                    if signature in repeated_reads:
+                        raise PlanningFailed(
+                            [{"code": "tool_loop", "tool": decision.tool_name}], step + 1
+                        )
+                    repeated_reads.add(signature)
+                    self.tools.store.audit(
+                        "tool.reuse", "skipped", chat_id=chat_id, tool=decision.tool_name
+                    )
+                    observations.append(
+                        {
+                            "tool": decision.tool_name,
+                            "reused": True,
+                            "guidance": "Identical read already succeeded; use its prior result. "
+                            "This duplicate was NOT executed. Choose a new step or explain "
+                            "the missing owner input; do not repeat this read again.",
+                        }
+                    )
+                    continue
+                if (
+                    decision.tool_name == "workflow.telegram_assistant"
+                    and personal_birthday_request(messages[-1]["content"])
+                ):
+                    observations.append(
+                        {
+                            "tool": decision.tool_name,
+                            "error": "Incoming chat template does not "
+                            "implement scheduled birthday greetings. Use the native catalog "
+                            "with a real outbound integration, or explain required capabilities.",
+                        }
+                    )
+                    continue
                 emit(
                     {
                         "type": "stage",
@@ -281,6 +375,17 @@ class ChatService:
                         }
                     )
                     emit({"type": "tool", "name": decision.tool_name, "status": "complete"})
+                    if decision.tool_name in READ_ONLY_TOOLS:
+                        read_results.add(signature)
+                    else:
+                        # A write/command may change files, catalog or remote state.
+                        read_results.clear()
+                        repeated_reads.clear()
+                    if decision.tool_name == "connections.list":
+                        guidance = connection_guidance(messages[-1]["content"], result)
+                        if guidance:
+                            decision = ChatDecision(action="reply", message=guidance)
+                            break
                     if isinstance(result, dict) and result.get("build_id"):
                         tool_build = self.history.builds.get(result["build_id"])
                         break
@@ -393,7 +498,14 @@ class ChatService:
             )
             if isinstance(exc, PlanningFailed):
                 errors = {item.get("code") for item in exc.errors}
-                if "step_budget" in errors:
+                if "tool_loop" in errors:
+                    tool = next(item["tool"] for item in exc.errors if item["code"] == "tool_loop")
+                    content = (
+                        f"طراحی هنوز کامل نشده است: مدل ابزار «{tool}» را با همان ورودی "
+                        "تکرار می‌کرد. تکرار را متوقف کردم و درخواست خواندن تکراری اجرا نشد. "
+                        "اتصال‌ها و اطلاعات لازم برای گام بعد را بررسی کن."
+                    )
+                elif "step_budget" in errors:
                     content = (
                         "کار در تعداد مراحل مجاز کامل نشد. نتیجهٔ ابزارها را در گزارش "
                         "فعالیت بررسی کن؛ می‌توانی درخواست را به چند کار کوچک‌تر تقسیم کنی."

@@ -461,10 +461,11 @@ def test_tool_budget_is_bounded(api, network):
             {
                 "action": "tool",
                 "message": "بررسی",
-                "tool_name": "system.inspect",
-                "tool_arguments": {},
+                "tool_name": "catalog.search",
+                "tool_arguments": {"query": f"integration_{index}"},
             }
         )
+        for index in range(api.app.state.tools.settings.local_max_steps)
     ]
     cid = chat(api)
     response = api.post(
