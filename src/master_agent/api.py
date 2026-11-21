@@ -4,7 +4,7 @@ import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Literal
-from uuid import UUID
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import Field, StrictBool
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from master_agent import __version__
 from master_agent.chat_repository import ChatRepository
 from master_agent.chat_service import ChatService
 from master_agent.clients import IntegrationError, N8nClient, OllamaClient
@@ -80,6 +81,14 @@ class ChatMessageRequest(ClosedModel):
     request_id: UUID
 
 
+class ChatOptions(ClosedModel):
+    target: Literal["auto", "n8n", "python", "code"] = "auto"
+
+
+class ResumeRequest(ClosedModel):
+    access_request_id: UUID
+
+
 class ActivationRequest(ClosedModel):
     confirm: StrictBool
     workflow_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
@@ -143,7 +152,7 @@ def create_app(
                 await bridges.close()
                 await connectors.close()
 
-    app = FastAPI(title="Master Local Agent", version="0.3.0", lifespan=lifespan)
+    app = FastAPI(title="BisCode", version=__version__, lifespan=lifespan)
     app.add_middleware(BodyLimit)
     bearer = HTTPBearer(auto_error=False)
 
@@ -187,7 +196,7 @@ def create_app(
             "model": cfg.ollama_model,
             "n8n_editor_url": cfg.n8n_base_url,
             "http_allowed_hosts": cfg.http_allowed_hosts,
-            "version": "0.3.0",
+            "version": __version__,
         }
 
     @app.get("/api/v1/chats", dependencies=auth)
@@ -195,8 +204,34 @@ def create_app(
         return {"chats": history.list()}
 
     @app.post("/api/v1/chats", dependencies=auth, status_code=201)
-    async def new_chat():
-        return history.create()
+    async def new_chat(body: ChatOptions | None = None):
+        return history.create(body.target if body else "auto")
+
+    @app.put("/api/v1/chats/{chat_id}/target", dependencies=auth)
+    async def chat_target(chat_id: str, body: ChatOptions):
+        return history.set_target(chat_id, body.target)
+
+    @app.post("/api/v1/chats/{chat_id}/resume", dependencies=auth, response_model=None)
+    async def resume_chat(chat_id: str, body: ResumeRequest, request: Request):
+        record = request.app.state.local_store.get("access_requests", str(body.access_request_id))
+        if record["chat_id"] != chat_id or record["status"] != "approved":
+            raise StateConflict("This task has no approved access request")
+        chat = history.get(chat_id)
+        user = next((m for m in chat["messages"] if m["id"] == record["message_id"]), None)
+        if not user:
+            raise StateConflict("Original task is no longer in this conversation context")
+        request_id = uuid5(NAMESPACE_URL, "biscode-resume:" + record["id"])
+        replay = history.find_turn(chat_id, str(request_id), user["content"])
+        if replay:
+            return {"replayed": True, **replay}
+        latest = next(m for m in reversed(chat["messages"]) if m["role"] == "user")
+        if latest["id"] != user["id"] or chat.get("target", "auto") != record.get("target", "auto"):
+            raise StateConflict("The task or build target changed; request fresh access")
+        if request.app.state.tools.permission(chat_id)["mode"] == "off":
+            raise StateConflict("Access expired or was revoked; approve a fresh request")
+        return await chat_message(
+            chat_id, ChatMessageRequest(content=user["content"], request_id=request_id), request
+        )
 
     @app.get("/api/v1/chats/{chat_id}", dependencies=auth)
     async def get_chat(chat_id: str):
