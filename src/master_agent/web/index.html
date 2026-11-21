@@ -6,9 +6,9 @@
     <meta name="theme-color" content="#191b1d" />
     <meta
       name="description"
-      content="با Master گفتگو کن، ایجنتت را طراحی کن و Workflow را در n8n بساز."
+      content="با BisCode گفتگو کن، ایجنتت را طراحی کن و Workflow را در n8n بساز."
     />
-    <title>Master — از ایده تا ایجنت</title>
+    <title>BisCode — ساخت ایجنت با n8n و Python</title>
     <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/assets/app.css" />
     <script type="module" src="/assets/app.js"></script>
@@ -17,9 +17,9 @@
     <a class="skip-link" href="#prompt">رفتن به نوشتن پیام</a>
     <div class="app-shell" id="app-shell">
       <aside class="sidebar" id="sidebar" aria-label="فضای کاری">
-        <a class="brand" href="/" aria-label="صفحهٔ آغاز Master"
+        <a class="brand" href="/" aria-label="صفحهٔ آغاز BisCode"
           ><span class="brand-symbol" data-icon="master"></span
-          ><span>master<span class="brand-dot">.</span></span
+          ><span>BisCode<span class="brand-dot">.</span></span
           ><span class="brand-tag">LOCAL</span></a
         >
         <button class="new-chat" id="new-chat">
@@ -32,6 +32,9 @@
         <button class="nav-item" id="all-workflows">
           <span data-icon="workflow"></span><span>Workflowهای من</span
           ><span class="nav-count" id="workflow-count">—</span>
+        </button>
+        <button class="nav-item" id="coding-projects-button">
+          <span data-icon="cube"></span><span>پروژه‌ها و کدنویسی</span>
         </button>
         <div class="history-heading">
           <span>گفتگوها</span
@@ -89,7 +92,7 @@
               aria-label="نمایش فهرست گفتگوها"
             >
               <span data-icon="menu"></span></button
-            ><span class="workspace-name">Master AI</span
+            ><span class="workspace-name">BisCode</span
             ><span class="slash">/</span
             ><span id="chat-title">گفتگوی تازه</span>
           </div>
@@ -175,7 +178,7 @@
           </div>
           <form class="composer" id="composer">
             <label class="sr-only" for="prompt"
-              >درخواستت را برای Master بنویس</label
+              >درخواستت را برای BisCode بنویس</label
             >
             <textarea
               id="prompt"
@@ -186,6 +189,13 @@
             ></textarea>
             <div class="composer-toolbar">
               <div class="composer-meta">
+                <label class="sr-only" for="build-target">روش ساخت</label>
+                <select id="build-target" aria-label="روش ساخت">
+                  <option value="auto">خودکار · پیش‌فرض n8n</option>
+                  <option value="n8n">ساخت با n8n</option>
+                  <option value="python">ساخت ایجنت Python</option>
+                  <option value="code">کدنویسی روی پروژه</option>
+                </select>
                 <span class="model-label"
                   ><span data-icon="model"></span
                   ><bdi id="model-label">Ollama · Local</bdi></span
@@ -211,7 +221,7 @@
             </div>
           </form>
           <p class="composer-caption">
-            Master طرح را می‌سازد؛ فعال‌سازی Workflow همیشه با تأیید توست.
+            BisCode طرح را می‌سازد؛ فعال‌سازی Workflow همیشه با تأیید توست.
           </p>
         </div>
       </main>
@@ -283,7 +293,7 @@
           id="connect-button"
           type="submit"
         >
-          اتصال به Master
+          اتصال به BisCode
         </button>
       </form>
       <div class="service-list" id="service-list"></div>
@@ -337,7 +347,7 @@
         <strong>اتصال n8n</strong>
         <p>
           Docker را اجرا کن، در n8n کلید API بساز و آن را در
-          <bdi>N8N_API_KEY</bdi> فایل <bdi>.env</bdi> بگذار. سپس Master را
+          <bdi>N8N_API_KEY</bdi> فایل <bdi>.env</bdi> بگذار. سپس BisCode را
           دوباره اجرا کن.
         </p>
         <code dir="ltr">docker compose up -d n8n</code>
@@ -435,7 +445,7 @@
     >
       <header class="dialog-header">
         <div>
-          <span class="eyebrow">MASTER LOCAL AGENT</span>
+          <span class="eyebrow">BISCODE LOCAL AGENT</span>
           <h2 id="local-agent-title">ابزارها و اتصال‌های محلی</h2>
         </div>
         <button
@@ -460,6 +470,12 @@
         </p>
         <p id="local-workspace" class="service-detail"></p>
         <form id="local-grant-form">
+          <label for="local-workspace-input">پوشهٔ مجاز این گفتگو</label
+          ><input
+            id="local-workspace-input"
+            dir="ltr"
+            placeholder="/absolute/path/to/project"
+          />
           <label for="local-access-mode">سطح دسترسی</label
           ><select id="local-access-mode">
             <option value="off">خاموش</option>
@@ -670,6 +686,97 @@
         <button class="text-button" id="local-refresh">تازه‌کردن وضعیت</button
         ><span class="service-detail">کلیدهای اصلی در اختیار مدل نیستند.</span>
       </footer>
+    </dialog>
+    <dialog
+      id="coding-access-dialog"
+      class="dialog coding-dialog"
+      aria-labelledby="coding-access-title"
+    >
+      <header class="dialog-header">
+        <div>
+          <p class="eyebrow">BISCODE · LOCAL ACCESS</p>
+          <h2 id="coding-access-title">اجازهٔ کار روی سیستم</h2>
+        </div>
+        <button
+          class="icon-button"
+          data-close="coding-access-dialog"
+          aria-label="بستن درخواست دسترسی"
+        >
+          <span data-icon="close"></span>
+        </button>
+      </header>
+      <p id="access-reason" class="dialog-intro"></p>
+      <p id="access-status" class="service-detail"></p>
+      <form id="access-form">
+        <label for="access-folder">پوشهٔ کار</label
+        ><input id="access-folder" dir="ltr" required />
+        <label for="access-level">محدودهٔ اجازه</label
+        ><select id="access-level">
+          <option value="workspace">
+            فقط خواندن و نوشتن فایل‌های این پوشه
+          </option>
+          <option value="system">فایل‌ها و اجرای فرمان با حساب کاربر</option>
+        </select>
+        <p class="service-detail">
+          اجازه برای همین گفتگو و ۴ ساعت است. اجرای فرمان با دسترسی حساب کاربر
+          انجام می‌شود و محیط ایزوله نیست. می‌توانی کار جاری را با «توقف کار»
+          قطع کنی.
+        </p>
+        <label class="check-label"
+          ><input type="checkbox" id="access-confirm" required /><span
+            >پوشه و سطح دسترسی را بررسی کردم و اجازهٔ ادامهٔ همین درخواست را
+            می‌دهم.</span
+          ></label
+        >
+        <div id="access-error" class="form-error" role="alert" hidden></div>
+        <div class="coding-actions">
+          <button class="primary-button" id="access-approve" type="submit">
+            اجازه و ادامه</button
+          ><button type="button" class="secondary-button" id="access-reject">
+            اجازه نمی‌دهم</button
+          ><button
+            type="button"
+            class="secondary-button"
+            id="access-resume"
+            hidden
+          >
+            ادامهٔ درخواست تأییدشده
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog
+      id="coding-projects-dialog"
+      class="dialog coding-dialog"
+      aria-labelledby="coding-projects-title"
+    >
+      <header class="dialog-header">
+        <div>
+          <p class="eyebrow">BISCODE · CODE WORKSPACE</p>
+          <h2 id="coding-projects-title">پروژه‌ها و تغییرات کد</h2>
+        </div>
+        <button
+          class="icon-button"
+          data-close="coding-projects-dialog"
+          aria-label="بستن پروژه‌ها"
+        >
+          <span data-icon="close"></span>
+        </button>
+      </header>
+      <p class="dialog-intro">
+        فایل‌های واقعی، خروجی آخرین تست و تغییرات ثبت‌شده را اینجا بررسی کن.
+        ساخت پروژه، سرویس آن را خودکار روشن نمی‌کند.
+      </p>
+      <div id="coding-error" class="form-error" role="alert" hidden></div>
+      <div id="coding-project-list"></div>
+      <div class="coding-actions">
+        <button class="secondary-button" id="coding-refresh">
+          تازه‌کردن پروژه‌ها</button
+        ><button class="secondary-button" id="coding-show-changes">
+          تغییرات این گفتگو
+        </button>
+      </div>
+      <div id="coding-changes"></div>
     </dialog>
   </body>
 </html>

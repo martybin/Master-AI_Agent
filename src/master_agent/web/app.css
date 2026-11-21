@@ -2223,3 +2223,99 @@ textarea:focus-visible {
     padding: 18px;
   }
 }
+/* BisCode local coding workspace */
+.coding-dialog {
+  width: min(850px, calc(100vw - 32px));
+  max-height: 90dvh;
+}
+.coding-dialog .dialog-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.coding-dialog label:not(.check-label) {
+  display: block;
+  margin: 18px 0 8px;
+  font-size: 14px;
+}
+.coding-dialog input:not([type="checkbox"]),
+.coding-dialog select,
+#local-workspace-input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+.coding-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 20px 0;
+}
+.coding-project {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 20px;
+  margin: 18px 0;
+}
+.coding-project > button {
+  margin: 12px 0 0 10px;
+}
+.coding-project h3 {
+  margin: 0 0 8px;
+}
+.coding-path {
+  direction: ltr;
+  text-align: left;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+.coding-output {
+  direction: ltr;
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: rgba(0, 0, 0, 0.15);
+  padding: 14px;
+  border-radius: 10px;
+  max-height: 360px;
+  overflow: auto;
+  font-size: 13px;
+}
+.coding-project details,
+#coding-changes details {
+  margin-top: 14px;
+}
+.coding-check {
+  font-size: 14px;
+}
+#build-target {
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 5px 8px;
+  max-width: 190px;
+}
+.composer-meta {
+  flex-wrap: wrap;
+}
+@media (max-width: 600px) {
+  .coding-project {
+    padding: 14px;
+  }
+  #build-target {
+    max-width: 160px;
+  }
+}
+
+.coding-dialog .service-detail {
+  font-size: 14px;
+}

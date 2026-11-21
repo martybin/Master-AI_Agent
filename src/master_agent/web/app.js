@@ -1,4 +1,5 @@
 import { mountLocalAgent } from "./local-ui.mjs";
+import { mountCoding } from "./coding-ui.mjs";
 import {
   statuses,
   nodeKinds,
@@ -109,7 +110,7 @@ const state = {
   pendingSend: false,
   streamController: null,
 };
-let toastTimer, elapsedTimer, pollTimer;
+let toastTimer, elapsedTimer, pollTimer, codingUI;
 const faNumber = (value) => new Intl.NumberFormat("fa-IR").format(value);
 const time = (value) =>
   new Intl.DateTimeFormat("fa-IR", {
@@ -167,6 +168,7 @@ function inspector(open) {
 function setBusy(busy) {
   state.busy = busy;
   $("send-button").disabled = busy;
+  $("build-target").disabled = busy;
   $("cancel-run").hidden = !busy;
   $("build-progress").hidden = !busy;
   clearInterval(elapsedTimer);
@@ -249,6 +251,7 @@ function newChat() {
 async function loadChat(id) {
   const chat = await api(`/chats/${encodeURIComponent(id)}`);
   state.chat = chat;
+  $("build-target").value = chat.target || "auto";
   safelyStore("master-chat", id);
   $("chat-title").textContent = chat.title;
   sidebar(false);
@@ -298,7 +301,11 @@ function renderMessages() {
     }
     const body = el("div", "message-body");
     body.append(
-      el("div", "message-role", message.role === "assistant" ? "Master" : "تو"),
+      el(
+        "div",
+        "message-role",
+        message.role === "assistant" ? "BisCode" : "تو",
+      ),
     );
     const content = el("div", "message-content");
     if (message.status === "pending") {
@@ -310,6 +317,7 @@ function renderMessages() {
       renderMarkdown(content, message.content);
     else content.textContent = message.content;
     body.append(content);
+    codingUI?.renderMessage(message, body);
     if (message.build_id) {
       const summary = state.builds.find(
         (build) => build.id === message.build_id,
@@ -859,9 +867,9 @@ function logout() {
   $("settings-dialog").close();
   toast("اتصال این تب قطع شد.");
 }
-async function submit(event) {
+async function submit(event, resume = null) {
   event?.preventDefault();
-  const content = $("prompt").value.trim();
+  const content = resume ? resume.content : $("prompt").value.trim();
   if (!content || state.busy) return;
   if (!requireConnection()) {
     state.pendingSend = true;
@@ -875,7 +883,10 @@ async function submit(event) {
   setStage("thinking");
   try {
     if (!state.chat) {
-      state.chat = await api("/chats", { method: "POST" });
+      state.chat = await api("/chats", {
+        method: "POST",
+        body: JSON.stringify({ target: $("build-target").value }),
+      });
       safelyStore("master-chat", state.chat.id);
     }
     chatId = state.chat.id;
@@ -905,15 +916,22 @@ async function submit(event) {
     sidebar(false);
     const controller = new AbortController();
     state.streamController = controller;
-    const response = await fetch(`/api/v1/chats/${chatId}/messages`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${state.key}`,
+    const response = await fetch(
+      `/api/v1/chats/${chatId}/${resume ? "resume" : "messages"}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${state.key}`,
+        },
+        body: JSON.stringify(
+          resume
+            ? { access_request_id: resume.id }
+            : { content, request_id: crypto.randomUUID() },
+        ),
+        signal: controller.signal,
       },
-      body: JSON.stringify({ content, request_id: crypto.randomUUID() }),
-      signal: controller.signal,
-    });
+    );
     if (state.epoch !== epoch) return;
     if (!response.ok) {
       const data = await response.json();
@@ -1200,6 +1218,43 @@ mountLocalAgent({
   requireConnection,
   refreshLists,
   loadChat,
+});
+codingUI = mountCoding({
+  api,
+  state,
+  el,
+  button,
+  showDialog,
+  showError,
+  toast,
+  requireConnection,
+  resume: async (record) => {
+    if (state.busy) {
+      toast("ابتدا کار جاری را متوقف یا تمام کن.");
+      return;
+    }
+    await loadChat(record.chat_id);
+    const original = state.chat.messages.find(
+      (m) => m.id === record.message_id,
+    );
+    if (!original) {
+      toast("درخواست اصلی در گفتگو پیدا نشد.");
+      return;
+    }
+    await submit(null, { ...record, content: original.content });
+  },
+});
+$("build-target").addEventListener("change", async () => {
+  if (!state.chat || !state.key) return;
+  try {
+    state.chat = await api(`/chats/${state.chat.id}/target`, {
+      method: "PUT",
+      body: JSON.stringify({ target: $("build-target").value }),
+    });
+  } catch (error) {
+    $("build-target").value = state.chat.target || "auto";
+    showError(error);
+  }
 });
 $("cancel-run").addEventListener("click", async () => {
   const id = state.busyChat || state.chat?.id;

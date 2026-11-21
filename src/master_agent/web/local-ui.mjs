@@ -79,6 +79,8 @@ export function mountLocalAgent({
           new Date(current.access.expires_at).toLocaleTimeString("fa-IR")
         : "");
     $("local-access-mode").value = current.access.mode;
+    $("local-workspace-input").value =
+      current.access.workspace || current.workspace;
     $("local-catalog-count").textContent =
       `${current.catalog_count} نوع گره در کاتالوگ ثبت شده است.`;
     $("local-tool-list").replaceChildren(
@@ -285,7 +287,10 @@ export function mountLocalAgent({
     event.preventDefault();
     run(async () => {
       if (!state.chat) {
-        const chat = await api("/chats", { method: "POST" });
+        const chat = await api("/chats", {
+          method: "POST",
+          body: JSON.stringify({ target: $("build-target").value }),
+        });
         await loadChat(chat.id);
       }
       await api(`/local/grants/${state.chat.id}`, {
@@ -294,6 +299,7 @@ export function mountLocalAgent({
           mode: $("local-access-mode").value,
           confirm: $("local-system-confirm").checked,
           hours: 4,
+          workspace: $("local-workspace-input").value || null,
         }),
       });
       $("local-system-confirm").checked = false;
