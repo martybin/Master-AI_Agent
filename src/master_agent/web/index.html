@@ -252,6 +252,46 @@
     </div>
     <div class="toast" id="toast" role="status" hidden></div>
     <dialog
+      id="delete-chat-dialog"
+      class="dialog"
+      aria-labelledby="delete-chat-heading"
+    >
+      <header class="dialog-header">
+        <h2 id="delete-chat-heading">حذف گفتگو</h2>
+        <button
+          class="icon-button"
+          data-close="delete-chat-dialog"
+          aria-label="بستن"
+        >
+          <span data-icon="close"></span>
+        </button>
+      </header>
+      <p id="delete-chat-title" class="delete-chat-title"></p>
+      <p class="dialog-intro">
+        این گفتگو و پیام‌هایش برای همیشه حذف می‌شوند و دسترسی محلی آن لغو
+        می‌شود. پروژه‌ها، فایل‌ها و Workflowهای ساخته‌شده باقی می‌مانند.
+      </p>
+      <form id="delete-chat-form">
+        <p id="delete-chat-error" class="form-error" role="alert" hidden></p>
+        <footer class="dialog-footer">
+          <button
+            class="secondary-button"
+            type="button"
+            data-close="delete-chat-dialog"
+          >
+            انصراف
+          </button>
+          <button
+            class="primary-button danger-button"
+            id="confirm-delete-chat"
+            type="submit"
+          >
+            <span data-icon="trash"></span>حذف گفتگو
+          </button>
+        </footer>
+      </form>
+    </dialog>
+    <dialog
       id="settings-dialog"
       class="dialog settings-dialog"
       aria-labelledby="settings-title"

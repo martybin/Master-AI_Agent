@@ -14,6 +14,8 @@ const $ = (id) => document.getElementById(id);
 const shapes = {
   master:
     '<path d="M12 2 15 9 22 12 15 15 12 22 9 15 2 12 9 9Z"/><path d="m12 8 1.5 2.5L16 12l-2.5 1.5L12 16l-1.5-2.5L8 12l2.5-1.5Z"/>',
+  pin: '<path d="m16 3 5 5-4 2-3 6-2-2-7 7m2-14 6-3 2-4ZM7 7l10 10"/>',
+  trash: '<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   chat: '<path d="M20 11.5a7.5 7.5 0 0 1-8 7.5H5l-3 3V11.5A7.5 7.5 0 0 1 10 4h2a7.5 7.5 0 0 1 8 7.5Z"/><path d="M7 9h8M7 13h5"/>',
   workflow:
@@ -81,15 +83,19 @@ function button(text, action, className = "secondary-button", glyph) {
 }
 function safelyRead(key) {
   try {
-    return sessionStorage.getItem(key);
+    return key === "master-chat"
+      ? localStorage.getItem(key) || sessionStorage.getItem(key)
+      : sessionStorage.getItem(key);
   } catch {
     return null;
   }
 }
 function safelyStore(key, value) {
   try {
-    if (value === null) sessionStorage.removeItem(key);
-    else sessionStorage.setItem(key, value);
+    const storage = key === "master-chat" ? localStorage : sessionStorage;
+    if (value === null) storage.removeItem(key);
+    else storage.setItem(key, value);
+    if (key === "master-chat") sessionStorage.removeItem(key);
   } catch {
     /* Tab storage is optional. */
   }
@@ -109,6 +115,7 @@ const state = {
   review: null,
   pendingSend: false,
   streamController: null,
+  deletingChat: null,
 };
 let toastTimer, elapsedTimer, pollTimer, codingUI;
 const faNumber = (value) => new Intl.NumberFormat("fa-IR").format(value);
@@ -211,19 +218,68 @@ function renderHistory() {
             : "گفتگوها بعد از اتصال اینجا نمایش داده می‌شوند.",
       ),
     );
+  let group;
   for (const chat of chats) {
+    const nextGroup = chat.pinned ? "پین‌شده‌ها" : "گفتگوهای قبلی";
+    if (group !== nextGroup) {
+      container.append(el("div", "history-group", nextGroup));
+      group = nextGroup;
+    }
+    const row = el(
+      "div",
+      "history-row" + (state.chat?.id === chat.id ? " active" : ""),
+    );
     const item = button(
       chat.title,
       () => loadChat(chat.id).catch(showError),
-      "history-item" + (state.chat?.id === chat.id ? " active" : ""),
-      "chat",
+      "history-item",
+      chat.pinned ? "pin" : "chat",
     );
     item.title = chat.title;
-    // Keep the title in its own truncating element.
+    if (state.chat?.id === chat.id) item.setAttribute("aria-current", "page");
     const text = item.lastChild;
-    const label = el("span", "", text.textContent);
-    text.replaceWith(label);
-    container.append(item);
+    text.replaceWith(el("span", "history-title", text.textContent));
+    const actions = el("div", "history-actions");
+    const pin = button(
+      "",
+      async () => {
+        pin.disabled = true;
+        try {
+          await api(`/chats/${encodeURIComponent(chat.id)}/pin`, {
+            method: "PUT",
+            body: JSON.stringify({ pinned: !chat.pinned }),
+          });
+          await refreshLists();
+        } catch (error) {
+          showError(error);
+        } finally {
+          pin.disabled = false;
+        }
+      },
+      "icon-button history-action",
+      "pin",
+    );
+    pin.title = chat.pinned ? "برداشتن پین" : "پین کردن گفتگو";
+    pin.setAttribute("aria-label", `${pin.title}: ${chat.title}`);
+    pin.setAttribute("aria-pressed", String(Boolean(chat.pinned)));
+    const remove = button(
+      "",
+      () => {
+        state.deletingChat = chat.id;
+        $("delete-chat-title").textContent = chat.title;
+        $("delete-chat-error").hidden = true;
+        showDialog("delete-chat-dialog");
+      },
+      "icon-button history-action delete-chat",
+      "trash",
+    );
+    remove.title = "حذف گفتگو";
+    remove.setAttribute("aria-label", `حذف گفتگو: ${chat.title}`);
+    remove.disabled = chat.status === "busy" || state.busyChat === chat.id;
+    if (remove.disabled) remove.title = "برای حذف، ابتدا کار جاری را متوقف کن";
+    actions.append(pin, remove);
+    row.append(item, actions);
+    container.append(row);
   }
 }
 async function refreshLists() {
@@ -829,8 +885,7 @@ async function connect(event) {
       state.pendingSend = false;
       await submit();
     } else {
-      const previous = safelyRead("master-chat");
-      if (previous) await loadChat(previous).catch(() => {});
+      await restoreChat();
     }
   } catch (error) {
     state.key = "";
@@ -849,6 +904,7 @@ function logout() {
   state.config = null;
   state.system = null;
   state.chats = [];
+  $("delete-chat-dialog").close();
   state.builds = [];
   state.busyChat = null;
   state.pendingSend = false;
@@ -1194,6 +1250,43 @@ document.addEventListener("keydown", (event) => {
 matchMedia("(max-width:700px)").addEventListener("change", () =>
   sidebar(false),
 );
+async function restoreChat() {
+  const saved = safelyRead("master-chat");
+  const id = state.chats.some((chat) => chat.id === saved)
+    ? saved
+    : state.chats[0]?.id;
+  if (id) await loadChat(id);
+}
+$("delete-chat-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const id = state.deletingChat;
+  if (!id) return;
+  const control = $("confirm-delete-chat");
+  control.disabled = true;
+  $("delete-chat-error").hidden = true;
+  try {
+    await api(`/chats/${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (state.chat?.id === id) newChat();
+    else if (safelyRead("master-chat") === id) safelyStore("master-chat", null);
+    state.deletingChat = null;
+    $("delete-chat-dialog").close();
+    await refreshLists();
+    toast("گفتگو حذف شد.");
+  } catch (error) {
+    if (error.message !== "session_changed") {
+      $("delete-chat-error").textContent =
+        error.status === 409
+          ? "برای حذف این گفتگو، ابتدا کار جاری را متوقف کن."
+          : errorMessage(error);
+      $("delete-chat-error").hidden = false;
+    }
+  } finally {
+    control.disabled = false;
+  }
+});
+$("delete-chat-dialog").addEventListener("close", () => {
+  state.deletingChat = null;
+});
 async function boot() {
   sidebar(false);
   renderHistory();
@@ -1201,8 +1294,7 @@ async function boot() {
   try {
     await refreshSystem();
     await refreshLists();
-    const id = safelyRead("master-chat");
-    if (id) await loadChat(id).catch(() => {});
+    await restoreChat();
   } catch {
     logout();
   }
