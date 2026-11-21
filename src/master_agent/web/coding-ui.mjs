@@ -21,10 +21,11 @@ export function mountCoding({
         : "عملیات کامل نشد؛ وضعیت پروژه و دسترسی را بررسی کن.";
     $("coding-error").hidden = false;
   }
-  async function openAccess(record) {
+  async function openAccess(record, { pendingOnly = false } = {}) {
     if (!requireConnection()) return;
     try {
       currentRequest = await api(`/local/access-requests/${record.id}`);
+      if (pendingOnly && currentRequest.status !== "pending") return;
       $("access-reason").textContent = currentRequest.reason;
       $("access-folder").value = currentRequest.workspace;
       $("access-level").value = currentRequest.mode;
@@ -236,15 +237,24 @@ export function mountCoding({
   );
   return {
     openProjects,
+    openAccess,
     renderMessage(message, body) {
-      if (message.access_request)
+      if (message.access_request) {
+        body.append(
+          el(
+            "p",
+            "coding-access-notice",
+            "برای ادامهٔ کدنویسی، پوشه و دسترسی از این کارت مدیریت می‌شود؛ تأیید با توست.",
+          ),
+        );
         body.append(
           button(
-            "بررسی درخواست دسترسی و ادامه",
+            "انتخاب پوشه و اجازهٔ کدنویسی",
             () => openAccess(message.access_request),
             "message-build-card",
           ),
         );
+      }
       if (message.project_id)
         body.append(
           button(

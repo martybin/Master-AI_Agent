@@ -7,7 +7,7 @@ run:
 test:
 	uv run pytest -q
 test-ui:
-	node --test tests/ui.test.mjs
+	node --test tests/*.test.mjs
 check:
 	uv run ruff check .
 	uv run ruff format --check .

@@ -2377,3 +2377,12 @@ textarea:focus-visible {
 .coding-dialog .service-detail {
   font-size: 14px;
 }
+
+.coding-access-notice {
+  color: #b5dfbd;
+  border-inline-start: 3px solid #75b988;
+  padding: 9px 12px;
+  background: #24332a;
+  border-radius: 6px;
+  line-height: 1.9;
+}

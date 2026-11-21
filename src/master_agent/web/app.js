@@ -934,7 +934,11 @@ async function submit(event, resume = null) {
   const epoch = state.epoch;
   let chatId,
     started = false,
-    finished = false;
+    finished = false,
+    pendingAccess = null,
+    assistantId = null,
+    recoveryTimer = null,
+    recoveryStopped = false;
   setBusy(true);
   setStage("thinking");
   try {
@@ -1001,25 +1005,60 @@ async function submit(event, resume = null) {
       finished = true;
       return;
     }
+    // A completed turn is durable even if a proxy/browser loses the final SSE frame.
+    const recover = async () => {
+      if (recoveryStopped || finished || !assistantId || state.epoch !== epoch)
+        return;
+      try {
+        const chat = await api(`/chats/${encodeURIComponent(chatId)}`);
+        if (recoveryStopped || finished || state.epoch !== epoch) return;
+        const message = chat.messages.find((item) => item.id === assistantId);
+        if (message && message.status !== "pending") {
+          finished = true;
+          pendingAccess = message.access_request || null;
+          if (state.chat?.id === chatId) {
+            state.chat = chat;
+            renderMessages();
+          }
+          controller.abort();
+          await refreshLists();
+          return;
+        }
+      } catch {
+        /* A temporary polling failure must not interrupt the event stream. */
+      }
+      if (!recoveryStopped && !finished && state.epoch === epoch)
+        recoveryTimer = setTimeout(recover, 2500);
+    };
     const parser = new EventParser((event) => {
       if (state.epoch !== epoch) return;
       if (event.type === "started") {
         started = true;
+        assistantId = event.assistant.id;
+        recoveryTimer = setTimeout(recover, 2500);
         if (state.chat?.id === chatId) {
           state.chat.messages = state.chat.messages.filter(
             (item) => !item.optimistic,
           );
           state.chat.messages.push(event.user, event.assistant);
+          state.chat.status = "busy";
           $("chat-title").textContent = content.slice(0, 48);
           renderMessages();
         }
+      } else if (event.type === "permission_required") {
+        pendingAccess = event.access_request;
+        $("progress-label").textContent = "ادامهٔ کار منتظر اجازهٔ دسترسی توست…";
       } else if (event.type === "stage") {
         setStage(event.stage, event.attempt);
         if (event.tool)
           $("progress-label").textContent = "در حال اجرای ابزار: " + event.tool;
+        if (event.step)
+          $("progress-label").textContent += " · مرحلهٔ " + faNumber(event.step);
       } else if (event.type === "complete" || event.type === "failed") {
         finished = true;
+        pendingAccess = event.message.access_request || pendingAccess;
         if (state.chat?.id === chatId) {
+          state.chat.status = "idle";
           state.chat.messages = state.chat.messages.filter(
             (item) => item.id !== event.message.id,
           );
@@ -1052,12 +1091,20 @@ async function submit(event, resume = null) {
       parser.push(decoder.decode(value, { stream: true }));
     }
     if (!finished) throw new Error("stream_interrupted");
+    if (state.chat?.id === chatId) await loadChat(chatId);
     await refreshLists();
   } catch (error) {
     if (state.epoch !== epoch || error.name === "AbortError") return;
-    showError(error);
     if (chatId && started) {
       await loadChat(chatId).catch(() => {});
+      const saved =
+        state.chat?.id === chatId
+          ? state.chat.messages.find((item) => item.id === assistantId)
+          : null;
+      if (saved && saved.status !== "pending") {
+        finished = true;
+        pendingAccess = saved.access_request || pendingAccess;
+      }
       if (state.chat?.status === "busy") schedulePoll(chatId);
     } else if (state.chat?.id === chatId) {
       state.chat.messages = state.chat.messages.filter(
@@ -1066,13 +1113,20 @@ async function submit(event, resume = null) {
       $("prompt").value = content;
       renderMessages();
     }
+    if (!finished) showError(error);
   } finally {
+    recoveryStopped = true;
+    clearTimeout(recoveryTimer);
     if (state.epoch === epoch) {
       state.busyChat = null;
       state.streamController = null;
       setBusy(state.chat?.status === "busy" && started && !finished);
       if (state.chat?.status === "busy" && !finished) schedulePoll(chatId);
       $("prompt").focus();
+      if (finished && pendingAccess && state.chat?.id === chatId) {
+        toast("برای ادامهٔ کدنویسی، پوشه و دسترسی را تأیید کن.");
+        await codingUI.openAccess(pendingAccess);
+      }
     }
   }
 }
@@ -1255,7 +1309,11 @@ async function restoreChat() {
   const id = state.chats.some((chat) => chat.id === saved)
     ? saved
     : state.chats[0]?.id;
-  if (id) await loadChat(id);
+  if (id) {
+    await loadChat(id);
+    const request = state.chat.messages.at(-1)?.access_request;
+    if (request) await codingUI.openAccess(request, { pendingOnly: true });
+  }
 }
 $("delete-chat-form").addEventListener("submit", async (event) => {
   event.preventDefault();

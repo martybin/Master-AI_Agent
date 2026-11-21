@@ -56,10 +56,10 @@ Docker socket mount or privilege escalation is provided.
   skips symlinks, private/generated files and files over 100 KB.
 - `files.read`: returns SHA256 of actual bytes and a short, chat/path-scoped revision.
 - `code.write_file`: create a new source file, or replace an existing file only
-  against a current read. It accepts `revision` or `expected_sha256`; if omitted,
-  the controller binds the last actual read of that path in this chat. Without
-  a read, existing files cannot be overwritten. Stale content still fails closed.
-- `code.replace`: one unique exact old snippet, replacement and read revision.
+  against a known content snapshot. It accepts `revision` or `expected_sha256`; if
+  omitted, the controller binds the last read or successful write of that path in
+  this chat. Unseen existing files cannot be overwritten. Stale content still fails closed.
+- `code.replace`: one unique exact old snippet, replacement and a revision from a read or successful write.
   Stale hashes, ambiguous matches and existing large files are rejected.
 - `code.changes`: actual changes recorded by these coding tools, as unified
   diffs. Before/after snapshots are Fernet-encrypted in `code_changes`; API
@@ -140,3 +140,38 @@ real Telegram credentials. Unit/integration tests also cover strict approval,
 request staleness/replay, path scope, edit conflicts, encrypted history, archive
 containment, stale/empty checks and cancellation. Keep one BisCode process and
 one worker per database.
+
+## وقتی بعد از پرامپت ادامه‌ای نمی‌بینی
+
+پیش از اولین نوشتن فایل، BisCode درخواست دسترسی ثبت می‌کند و پنجرهٔ انتخاب پوشه
+و سطح اجازه را باز می‌کند. این مرحله هنوز کد را اجرا نکرده است. پوشه را انتخاب کن،
+تأیید را علامت بزن و «اجازه و ادامه» را بزن. اگر صفحه را ببندی، درخواست معلق در
+چت ذخیره می‌ماند و پس از ورود دوباره نمایش داده می‌شود. درخواست قبلاً تأییدشده
+خودکار دوباره اجازه نمی‌گیرد. برای اجرای تست به سطح اجرای فرمان نیاز است.
+
+رابط علاوه بر رویدادهای زنده، وضعیت پیام در حال پردازش را از دیتابیس بررسی
+می‌کند؛ اگر رویداد پایان اتصال از دست برود، پاسخ ذخیره‌شده بازیابی می‌شود.
+«کدنویسی روی پروژه» برای اسکریپت‌ها و ابزارهای معمولی از نوشتن فایل و اجرای تست
+استفاده می‌کند. قالب آمادهٔ چت با Ollama به روش «ساخت ایجنت Python» اختصاص دارد.
+
+اگر اجرای دسکتاپ فرمان `python` یا `python3` را در PATH پیدا نکند، آن نام ساده
+به مفسر Python خود BisCode تبدیل می‌شود. مسیر صریح مفسر و فرمان‌های دیگر تغییر
+نمی‌کنند. `system.inspect` مسیر واقعی را با `python_executable` برمی‌گرداند.
+
+پس از هر خواندن یا نوشتن موفق، یک revision و اثر انگشت محتوا نگه داشته می‌شود.
+ویرایش بعدی می‌تواند از همین نسخهٔ شناخته‌شده استفاده کند؛ بنابراین مدل برای هر
+اصلاح روی کدی که خودش نوشته مجبور به خواندن دوباره نیست. اگر کاربر یا برنامهٔ
+دیگری فایل را تغییر داده باشد، تطبیق اثر انگشت همچنان ویرایش را رد می‌کند و
+خواندن نسخهٔ تازه لازم است. revision صریح قدیمی هم همچنان رد می‌شود.
+
+خروجی تصمیم کدنویسی با JSON Schema جداگانه برای نام و آرگومان هر ابزار تولید
+می‌شود؛ آرگومان‌های یک ابزار نمی‌توانند به‌جای ابزار دیگر قرار بگیرند. فیلدهای
+اختیاری کپی‌کردن hash در فهرست ابزارهای مدل کوچک نشان داده نمی‌شوند، چون کنترلر
+همان محافظ نسخه را از خواندن/نوشتن واقعی اعمال می‌کند. API مستقیم همچنان revision
+و expected_sha256 صریح را می‌پذیرد و نسخهٔ اشتباه را رد می‌کند.
+
+برای ابزارهای عادی Python، `code.check` با `path` پوشهٔ سورس که `tests/` داخلش است
+اجرا می‌شود. فرمان تست، پوشهٔ اجرا و مفسر را کنترلر تعیین می‌کند؛ نتیجه و تعداد
+تست‌ها در `code_runs` ذخیره می‌شوند. صفر تست، timeout یا تغییر سورس حین بررسی
+قبولی محسوب نمی‌شود. این ابزار هم به اجازهٔ system نیاز دارد. شکست طرح پس از
+نوشتن فایل، مسیر فایل‌های واقعاً تغییرکرده و وضعیت تست را در همان پاسخ نشان می‌دهد.
