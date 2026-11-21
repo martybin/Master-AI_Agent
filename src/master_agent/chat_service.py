@@ -10,7 +10,7 @@ from pydantic import Field, ValidationError
 
 from master_agent.chat_repository import ChatRepository
 from master_agent.clients import IntegrationError, OllamaClient
-from master_agent.coding_policy import coding_action, target_for
+from master_agent.coding_policy import coding_action, decision_schema, target_for
 from master_agent.compiler import digest
 from master_agent.ir import ClosedModel
 from master_agent.local.access import AccessRequest, AccessRequired, request_access
@@ -109,12 +109,27 @@ class ChatService:
                 "a necessary question. Never use action=build or create an n8n workflow in "
                 "this mode. Actually create/edit the requested files; a suggested code block "
                 "is not implementation. For a new Python AI agent, use "
-                "project.create_python_agent as the working base, then customize agent.py "
-                "and tests for the requested capabilities. The base is a stateless Ollama "
+                "project.create_python_agent when it is available (Python agent mode), "
+                "then customize agent.py "
+                "and tests for the requested capabilities. For ordinary scripts, codecs, "
+                "utilities and libraries, DO NOT call project.create_python_agent: it creates "
+                "an unrelated AI chat server. Instead use project.inspect then code.write_file "
+                "to create the requested source and matching unittest files in a descriptive "
+                "subfolder. For normal Python code run code.check with path set to that "
+                "source folder (the folder CONTAINING tests/). It handles Python, cwd and "
+                "imports automatically. Do not manually construct unittest shell commands. "
+                "A missing LOCAL module is a cwd/import path problem: do not pip-install "
+                "the script you just wrote. "
+                "project.check is only for registered AI agent projects with a project_id. "
+                "Tests must exercise the behavior requested by the user, not just a template. "
+                "Report actual paths and test output in the final reply. The base is a stateless "
+                "Ollama "
                 "chat agent, not an arbitrary integration: do not silently substitute it "
                 "for Telegram, RAG, scheduling or other requested behavior. Read/search "
-                "existing files first. Prefer code.replace for small edits with the short "
-                "revision from files.read (or its SHA256). Do not rewrite a whole file to "
+                "existing files first. Prefer code.replace for small edits. File versions "
+                "are tracked automatically from real reads and successful writes; never invent "
+                "or copy revision/hash arguments. New files need only path and content. "
+                "Do not rewrite a whole file to "
                 "add a small function. Review code.changes, run project.check, inspect failures "
                 "and fix them before reporting success. terminal.exec can install needed "
                 "dependencies or run other checks with a system grant. Never invent tool "
@@ -218,17 +233,10 @@ class ChatService:
                 ]
             }
         if coding:
-            schema["properties"]["action"]["enum"] = ["reply", "tool"]
-            schema["properties"]["tool_name"] = {
-                "enum": [None, *[e["name"] for e in self.tools.manifest(target)]]
-            }
-            schema["required"] = ["action", "message", "tool_name", "tool_arguments"]
+            schema = decision_schema(self.tools.manifest(target), force_tool=force_tool)
         if force_tool:
-            schema["properties"]["action"]["enum"] = ["tool"]
-            if coding:
-                schema["properties"]["tool_name"]["enum"] = [
-                    e["name"] for e in self.tools.manifest(target)
-                ]
+            if not coding:
+                schema["properties"]["action"]["enum"] = ["tool"]
             turns[0]["content"] += (
                 "\nCompletion review found unfinished work. Your next decision MUST be "
                 "action=tool to perform a concrete remaining action listed by the review. "
@@ -320,12 +328,46 @@ class ChatService:
                 [{"code": "completion_schema", "message": "Invalid completion review"}], 1
             ) from None
 
+    def coding_progress(self, chat_id, since):
+        if not self.tools or not since:
+            return ""
+        records = [
+            r
+            for r in self.tools.store.list("code_changes")
+            if r.get("chat_id") == chat_id and r.get("updated_at", "") >= since
+        ]
+        if not records:
+            return ""
+        paths = [
+            r["path"] for r in sorted(records, key=lambda r: r["updated_at"], reverse=True)[:8]
+        ]
+        summary = "\n\nفایل‌های نوشته یا ویرایش‌شده در این نوبت:\n" + "\n".join(
+            "- `" + path + "`" for path in paths
+        )
+        runs = [
+            r
+            for r in self.tools.store.list("code_runs")
+            if r.get("chat_id") == chat_id and r.get("created_at", "") >= since
+        ]
+        if runs:
+            run = runs[0]
+            summary += "\nآخرین تست: " + (
+                f"{run.get('tests_run', 0)} تست پاس شد."
+                if run["status"] == "passed"
+                else "هنوز موفق نشده است."
+            )
+        else:
+            summary += "\nقبولی تست برای این تغییرات تأیید نشده است."
+        return self.tools.store.redact(summary)
+
     async def run(self, chat_id: str, assistant_id: str, emit: Callable[[dict], None]) -> None:
         project_id, pending_access = None, None
+        coding, turn_started = False, None
         try:
             emit({"type": "stage", "stage": "thinking"})
             chat = self.history.get(chat_id)
             messages = [message for message in chat["messages"] if message["status"] != "pending"]
+            turn_started = messages[-1]["created_at"]
             target = target_for(chat, messages[-1]["content"])
             coding = target in {"python", "code"}
             max_steps = (
@@ -382,6 +424,8 @@ class ChatService:
                     emit({"type": "complete", "message": message, "build": None})
                     return
             for step in range(initial_steps, max_steps):
+                if coding and step > initial_steps:
+                    emit({"type": "stage", "stage": "thinking", "step": step + 1})
                 decision = await self.decide(
                     messages,
                     previous_ir,
@@ -556,7 +600,20 @@ class ChatService:
                         if isinstance(exc, (StateConflict, IntegrationError))
                         else "Tool failed; inspect connection or arguments"
                     )
-                    observations.append({"tool": decision.tool_name, "error": detail})
+                    failure = {"tool": decision.tool_name, "error": detail}
+                    if coding and decision.tool_name in {"code.write_file", "code.replace"}:
+                        failure["path"] = decision.tool_arguments.get("path")
+                        failure["guidance"] = (
+                            "Do not repeat the same failed write. Call files.read on this path "
+                            "first, inspect current content, then edit with only published fields. "
+                            "Do not pass revision or expected_sha256; tracking is automatic."
+                        )
+                    if isinstance(exc, FileNotFoundError) and decision.tool_name == "terminal.exec":
+                        failure["guidance"] = (
+                            "Executable or working directory does not exist. Use system.inspect "
+                            "to get python_executable and workspace; inspect the directory first."
+                        )
+                    observations.append(failure)
                     emit({"type": "tool", "name": decision.tool_name, "status": "failed"})
                     if isinstance(exc, IntegrationError) and exc.code == "mutation_unknown":
                         decision = ChatDecision(
@@ -685,6 +742,8 @@ class ChatService:
                         "طرحی که اعتبارسنجی را بگذراند ساخته نشد. درخواستت را کمی ساده‌تر و "
                         "دقیق‌تر بگو؛ مثلاً ورودی، کار اصلی و خروجی را مشخص کن."
                     )
+            if coding:
+                content += self.coding_progress(chat_id, turn_started)
             message = self.history.finish_turn(chat_id, assistant_id, content, error_code=code)
             emit({"type": "failed", "message": message})
         except Exception:

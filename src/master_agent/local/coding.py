@@ -59,6 +59,10 @@ class ProjectCheck(ClosedModel):
     timeout: int = Field(default=60, ge=1, le=120)
 
 
+class CodeCheck(InspectArgs):
+    timeout: int = Field(default=60, ge=1, le=120)
+
+
 class EmptyArgs(ClosedModel):
     pass
 
@@ -98,7 +102,8 @@ class Coding:
             (
                 "code.write_file",
                 "Create a source file or replace it. Existing files REQUIRE "
-                "revision (short handle) OR expected_sha256 from files.read; saves a diff.",
+                "revision (short handle) OR expected_sha256 from files.read or a successful "
+                "write. Without either, uses the last known snapshot in this chat; saves a diff.",
                 CodeWrite,
                 "workspace",
                 self.write,
@@ -117,6 +122,16 @@ class Coding:
                 EmptyArgs,
                 "workspace",
                 lambda a, ctx: self.changes(ctx.chat_id),
+            ),
+            (
+                "code.check",
+                "Run actual unittest tests for a normal Python script/library folder. "
+                "Set path to the SOURCE folder containing tests/, e.g. path='my-code'. "
+                "Automatically uses the right Python, working directory and import path. "
+                "Do not construct a shell/unittest command yourself. Requires system access.",
+                CodeCheck,
+                "system",
+                self.check_code,
             ),
             (
                 "project.check",
@@ -228,6 +243,20 @@ class Coding:
                 "sealed": self.store.seal({"before": initial, "after": content}),
             }
             self.store.put("code_changes", key, record)
+            # A successful write is a known content snapshot too. Subsequent edits
+            # may use it, while the byte-hash comparison still rejects outside changes.
+            revision = "r" + uuid4().hex[:8]
+            self.store.put(
+                "code_revisions",
+                revision,
+                {
+                    "id": revision,
+                    "chat_id": ctx.chat_id,
+                    "path": str(path),
+                    "sha256": record["after_sha256"],
+                    "source": "write",
+                },
+            )
             for project in self.projects(ctx.chat_id):
                 root = Path(project["path"])
                 if path.is_relative_to(root):
@@ -238,6 +267,7 @@ class Coding:
             return {
                 "path": str(path),
                 "sha256": record["after_sha256"],
+                "revision": revision,
                 "created": not exists,
                 "written": len(content),
             }
@@ -256,7 +286,7 @@ class Coding:
             return reference["sha256"]
         if args.expected_sha256:
             return args.expected_sha256
-        # Bind to the last actual read in this chat. The LLM need not copy a
+        # Bind to the last read or successful write in this chat. The LLM need not copy a
         # 64-character hash correctly; the same optimistic comparison still runs.
         for reference in self.store.list("code_revisions"):
             if reference["chat_id"] == ctx.chat_id and reference["path"] == str(path):
@@ -370,13 +400,47 @@ class Coding:
             hashes[name] = sha(path.read_bytes())
         return sha(json.dumps(hashes, sort_keys=True).encode())
 
-    async def check(self, args, ctx):
-        from master_agent.local.tools import CommandArgs
+    def code_snapshot(self, root):
+        import os
 
+        files = []
+        for parent, dirs, names in os.walk(root, followlinks=False):
+            dirs[:] = [
+                d
+                for d in dirs
+                if d
+                not in {".git", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache"}
+                and not Path(parent, d).is_symlink()
+            ]
+            for name in names:
+                if name.endswith(".py"):
+                    files.append(Path(parent, name).relative_to(root).as_posix())
+                    if len(files) > 1000:
+                        raise StateConflict("Choose a smaller source folder to check")
+        return {"id": None, "path": str(root), "files": sorted(files)}
+
+    async def check_code(self, args, ctx):
+        root = self.path(args.path, ctx)
+        if not root.is_dir() or not (root / "tests").is_dir():
+            raise StateConflict(
+                "Choose the source folder containing tests/; create test files first"
+            )
+        self.path(str(root / "tests"), ctx)
+        project = self.code_snapshot(root)
+        return await self._check(project, root, args.timeout, ctx, lambda: self.code_snapshot(root))
+
+    async def check(self, args, ctx):
         project = self.store.get("projects", str(args.project_id))
         if project["chat_id"] != ctx.chat_id:
             raise StateConflict("Select a project belonging to this chat")
         root = self.project_path(project, ctx)
+        return await self._check(
+            project, root, args.timeout, ctx, lambda: self.store.get("projects", project["id"])
+        )
+
+    async def _check(self, project, root, limit_seconds, ctx, current):
+        from master_agent.local.tools import CommandArgs
+
         before = self.fingerprint(project)
         run = {
             "id": str(uuid4()),
@@ -385,6 +449,7 @@ class Coding:
             "status": "running",
             "created_at": now(),
             "fingerprint": before,
+            "path": str(root),
         }
         self.store.put("code_runs", run["id"], run)
         try:
@@ -392,12 +457,12 @@ class Coding:
                 CommandArgs(
                     argv=[sys.executable, "-m", "unittest", "discover", "-s", "tests", "-v"],
                     cwd=str(root),
-                    timeout=args.timeout,
+                    timeout=limit_seconds,
                 ),
                 ctx,
             )
             result = self.store.redact(result)
-            same = before == self.fingerprint(self.store.get("projects", project["id"]))
+            same = before == self.fingerprint(current())
             count = re.search(r"Ran (\d+) tests?", result["stdout"] + result["stderr"])
             tests_run = int(count[1]) if count else 0
             passed = result["exit_code"] == 0 and not result["timed_out"] and same and tests_run > 0
@@ -416,7 +481,7 @@ class Coding:
             raise
         finally:
             self.store.put("code_runs", run["id"], run)
-        return {"project_id": project["id"], "run": run}
+        return {"project_id": project["id"], "path": str(root), "run": run}
 
     def archive(self, project_id):
         project = self.store.get("projects", project_id)

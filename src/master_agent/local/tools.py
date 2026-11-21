@@ -8,6 +8,7 @@ import os
 import platform
 import shutil
 import signal
+import sys
 import tempfile
 import time
 from datetime import UTC, datetime, timedelta
@@ -43,8 +44,19 @@ class WriteArgs(PathArgs):
 
 
 class CommandArgs(ClosedModel):
-    argv: list[str] = Field(min_length=1, max_length=80)
-    cwd: str = "."
+    argv: list[str] = Field(
+        min_length=1,
+        max_length=80,
+        description="Executable and arguments, directly without a shell. Do not use cd, "
+        "&&, pipes or redirection here; set cwd instead. For Python tests use "
+        "['python','-m','unittest','discover','-s','tests','-v'].",
+    )
+    cwd: str = Field(
+        default=".",
+        description="Working directory relative to the granted workspace. For source in "
+        "my-project and tests in my-project/tests, set cwd='my-project' and use -s tests. "
+        "Do not repeat the project path inside -s when cwd already points there.",
+    )
     timeout: int = Field(default=30, ge=1, le=120)
 
 
@@ -253,7 +265,7 @@ class Tools:
             self.store.audit("plugin.load", "complete", module=module)
 
     def manifest(self, target=None):
-        return [
+        entries = [
             {
                 "name": e["name"],
                 "description": e["description"],
@@ -261,10 +273,28 @@ class Tools:
                 "parameters": e["schema"].model_json_schema(),
             }
             for e in self.entries.values()
+            if target != "code" or e["name"] != "project.create_python_agent"
             if target not in {"python", "code"} or e["name"] != "files.write"
             if target not in {"python", "code"}
             or not e["name"].startswith(("catalog.", "workflow.", "n8n."))
         ]
+        if target in {"python", "code"}:
+            for entry in entries:
+                if entry["name"] in {"code.write_file", "code.replace"}:
+                    # The controller tracks actual reads/writes and guards their hashes.
+                    # Keep optional manual version handles out of the small model's task.
+                    for key in ("revision", "expected_sha256"):
+                        entry["parameters"]["properties"].pop(key, None)
+                    entry["description"] = (
+                        "Create/write source file; existing files need a prior files.read "
+                        "or successful write in THIS chat. "
+                        if entry["name"] == "code.write_file"
+                        else "Replace one unique exact old snippet; first read the source. "
+                    ) + (
+                        "The controller automatically uses the last known file version and "
+                        "rejects outside changes. Use ONLY the published argument fields."
+                    )
+        return entries
 
     def grant(self, chat_id: str, data: GrantInput):
         if data.mode == "system" and data.confirm is not True:
@@ -379,6 +409,7 @@ class Tools:
         return {
             "os": platform.system(),
             "python": platform.python_version(),
+            "python_executable": sys.executable,
             "workspace": str(getattr(ctx, "workspace", self.settings.local_workspace).resolve()),
             "docker": bool(shutil.which("docker")),
             "n8n_configured": bool(self.settings.n8n_api_key.get_secret_value()),
@@ -448,6 +479,11 @@ class Tools:
         return self.catalog.import_n8n(data)
 
     async def command(self, args, mode):
+        if args.argv[0] == "cd":
+            raise StateConflict(
+                "cd is a shell builtin, not an executable. Put the directory in cwd and "
+                "the command in argv. Nothing was executed."
+            )
         cwd = self.resolve(args.cwd, mode)
         env = {
             key: value
@@ -457,8 +493,13 @@ class Tools:
                 for part in ("TOKEN", "SECRET", "PASSWORD", "API_KEY", "API_HASH")
             )
         }
+        argv = list(args.argv)
+        # Desktop launches often omit the activated venv from PATH. Keep explicit
+        # interpreters unchanged; supply our known Python only for a missing alias.
+        if argv[0] in {"python", "python3"} and shutil.which(argv[0]) is None:
+            argv[0] = sys.executable
         process = await asyncio.create_subprocess_exec(
-            *args.argv,
+            *argv,
             cwd=cwd,
             env=env,
             stdout=asyncio.subprocess.PIPE,
@@ -501,6 +542,7 @@ class Tools:
                 raise
             timed_out = True
         result = {
+            "executable": argv[0],
             "exit_code": process.returncode,
             "stdout": buffers[0][0].decode(errors="replace"),
             "stderr": buffers[1][0].decode(errors="replace"),
