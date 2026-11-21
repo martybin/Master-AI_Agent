@@ -1,5 +1,6 @@
+import { setText, msg, dateTime, number } from "./i18n.mjs?v=0.4.3";
 // Owner-only connection and local capability controls. Secrets never enter chat history.
-import { statuses } from "./ui-utils.mjs?v=0.4.1";
+import { statuses } from "./ui-utils.mjs?v=0.4.3";
 
 export function mountLocalAgent({
   api,
@@ -42,10 +43,12 @@ export function mountLocalAgent({
   };
   const statusLabel = (value) => localStates[value] || value;
   function error(err) {
-    $("local-panel-error").textContent =
+    setText(
+      $("local-panel-error"),
       err.status === 409 && typeof err.detail === "string"
         ? err.detail
-        : "Could not complete the operation. Check the connection, sign-in, and settings.";
+        : "Could not complete the operation. Check the connection, sign-in, and settings.",
+    );
     $("local-panel-error").hidden = false;
     showError(err);
   }
@@ -70,19 +73,34 @@ export function mountLocalAgent({
       "/local/status" +
         (state.chat ? "?chat_id=" + encodeURIComponent(state.chat.id) : ""),
     );
-    $("local-workspace").textContent = "Workspace: " + current.workspace;
-    $("local-current-grant").textContent =
-      "Chat access: " +
-      modes[current.access.mode] +
-      (current.access.expires_at
-        ? " · Expires: " +
-          new Date(current.access.expires_at).toLocaleTimeString("en-US")
-        : "");
+    setText(
+      $("local-workspace"),
+      msg("Workspace: {path}", { path: current.workspace }),
+    );
+    setText(
+      $("local-current-grant"),
+      msg("Chat access: {mode}{expiry}", {
+        mode: msg(modes[current.access.mode]),
+        expiry: current.access.expires_at
+          ? msg(" · Expires: {time}", {
+              time: dateTime(current.access.expires_at, {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              }),
+            })
+          : "",
+      }),
+    );
     $("local-access-mode").value = current.access.mode;
     $("local-workspace-input").value =
       current.access.workspace || current.workspace;
-    $("local-catalog-count").textContent =
-      `${current.catalog_count} node types available in the catalog.`;
+    setText(
+      $("local-catalog-count"),
+      msg("{count} node types available in the catalog.", {
+        count: number(current.catalog_count),
+      }),
+    );
     $("local-tool-list").replaceChildren(
       ...current.tools.map((tool) => {
         const item = el("div", "local-tool");
@@ -109,11 +127,15 @@ export function mountLocalAgent({
       const card = el("article", "local-connection-card");
       const info = el("div");
       info.append(
-        el("strong", "", connection.label),
+        el("strong", "", connection.label, false),
         el(
           "p",
           "service-detail",
-          `${connection.id} · ${kinds[connection.kind]} · ${statusLabel(connection.status)}`,
+          msg("{id} · {kind} · {status}", {
+            id: connection.id,
+            kind: msg(kinds[connection.kind]),
+            status: msg(statusLabel(connection.status)),
+          }),
         ),
       );
       card.append(info);
@@ -139,8 +161,10 @@ export function mountLocalAgent({
             () => {
               loginAlias = connection.id;
               $("telegram-password-fields").hidden = true;
-              $("telegram-login-title").textContent =
-                "Sign in to " + connection.label;
+              setText(
+                $("telegram-login-title"),
+                msg("Sign in to {label}", { label: connection.label }),
+              );
               $("telegram-login-panel").hidden = false;
               $("telegram-phone-form").hidden = false;
               $("telegram-code-form").hidden = true;
@@ -157,14 +181,26 @@ export function mountLocalAgent({
       option("", "Select a connection"),
       ...current.connections
         .filter((c) => c.kind !== "http")
-        .map((c) => option(c.id, c.label + " · " + kinds[c.kind])),
+        .map((c) =>
+          option(
+            c.id,
+            msg("{label} · {kind}", {
+              label: c.label,
+              kind: msg(kinds[c.kind]),
+            }),
+          ),
+        ),
     );
     $("binding-build").replaceChildren(
       option("", "Select a workflow"),
       ...state.builds.map((b) =>
         option(
           b.id,
-          `${b.name} · ${statuses[b.status] || b.status} · ${b.id.slice(0, 8)}`,
+          msg("{name} · {status} · {id}", {
+            name: b.name,
+            status: msg(statuses[b.status] || b.status),
+            id: b.id.slice(0, 8),
+          }),
         ),
       ),
     );
@@ -176,7 +212,11 @@ export function mountLocalAgent({
       const card = el("article", "local-connection-card");
       card.append(
         el("strong", "", binding.id),
-        el("p", "service-detail", `Status: ${statusLabel(binding.status)}`),
+        el(
+          "p",
+          "service-detail",
+          msg("Status: {status}", { status: msg(statusLabel(binding.status)) }),
+        ),
       );
       card.append(
         button(
@@ -233,7 +273,10 @@ export function mountLocalAgent({
         el(
           "p",
           "service-detail",
-          `${item.connection} · ${statusLabel(item.status)}`,
+          msg("{connection} · {status}", {
+            connection: item.connection,
+            status: msg(statusLabel(item.status)),
+          }),
         ),
       );
       if (["pending", "uncertain"].includes(item.status))
@@ -263,15 +306,21 @@ export function mountLocalAgent({
     }
     $("local-audit").replaceChildren(
       el("h3", "", "Recent activity"),
-      ...current.audit
-        .slice(0, 20)
-        .map((item) =>
-          el(
-            "p",
-            "service-detail",
-            `${new Date(item.at).toLocaleTimeString("en-US")} · ${item.tool || item.action} · ${item.status}`,
-          ),
+      ...current.audit.slice(0, 20).map((item) =>
+        el(
+          "p",
+          "service-detail",
+          msg("{time} · {action} · {status}", {
+            time: dateTime(item.at, {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            }),
+            action: item.tool || item.action,
+            status: msg(statusLabel(item.status)),
+          }),
         ),
+      ),
     );
   }
   $("local-agent-button").addEventListener("click", () => {

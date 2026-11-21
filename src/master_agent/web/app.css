@@ -776,6 +776,18 @@ textarea:focus-visible {
   width: 16px;
   height: 16px;
 }
+.send-button.is-stop {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0;
+  border-radius: 50%;
+  justify-content: center;
+}
+.send-button.is-stop svg {
+  width: 14px;
+  height: 14px;
+}
 .composer-caption {
   text-align: center;
   font-size: 10px;
@@ -2253,12 +2265,55 @@ textarea:focus-visible {
   max-height: 250px;
   overflow: auto;
 }
-.cancel-run {
-  font-size: 12px;
-  min-height: 32px;
-  padding: 4px 11px;
-  border-color: #80614e;
-  color: #e2c0aa;
+.path-field {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.path-field input {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+.path-field .secondary-button {
+  flex: none;
+  min-height: 44px;
+}
+.folder-picker {
+  width: min(720px, calc(100vw - 32px));
+}
+.folder-list {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  max-height: 360px;
+  overflow: auto;
+}
+.folder-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  min-height: 40px;
+}
+.folder-row:hover {
+  background: #2a3830;
+}
+.folder-row.file {
+  color: var(--muted);
+}
+.folder-row svg {
+  width: 16px;
+  height: 16px;
+}
+.folder-list .service-detail {
+  margin: 12px;
 }
 .local-agent-dialog input:not([type="checkbox"]) {
   min-width: 0;
@@ -2307,6 +2362,12 @@ textarea:focus-visible {
   background: var(--bg);
   color: var(--text);
   font: inherit;
+}
+.coding-dialog .path-field input,
+#local-workspace-input {
+  width: auto;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .coding-actions {
   display: flex;
@@ -2413,4 +2474,131 @@ textarea:focus-visible {
   .sidebar {
     overflow-y: auto;
   }
+}
+
+/* Language is a view preference. Source code, identifiers and input values stay verbatim. */
+.language-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+}
+.language-switch svg {
+  width: 15px;
+  height: 15px;
+}
+.language-switch select {
+  width: auto;
+  min-height: 32px;
+  margin: 0;
+  padding: 4px 22px 4px 8px;
+  border-radius: 7px;
+  font-size: 12px;
+}
+.folder-create-form {
+  margin-top: 16px;
+}
+.folder-name {
+  overflow-wrap: anywhere;
+}
+.folder-row {
+  text-align: start;
+}
+html[lang="fa"] {
+  --font: Vazirmatn, system-ui, sans-serif;
+}
+html[dir="rtl"]
+  :is(
+    .app-shell,
+    .sidebar,
+    .workspace,
+    .topbar,
+    .connection-button,
+    .composer-toolbar,
+    .composer-hint,
+    .send-button,
+    .inspector,
+    .dialog,
+    .toast
+  ) {
+  direction: rtl;
+}
+html[dir="rtl"] .sidebar {
+  border-right: 0;
+  border-left: 1px solid var(--line-soft);
+}
+html[dir="rtl"] .inspector {
+  border-left: 0;
+  border-right: 1px solid #343f36;
+}
+html[dir="rtl"] .message.user {
+  justify-content: flex-start;
+  padding-inline-start: 0;
+  padding-inline-end: 40px;
+}
+html[dir="rtl"] .language-switch select {
+  direction: ltr;
+}
+html[dir="rtl"] .welcome h1 {
+  letter-spacing: 0;
+  line-height: 1.65;
+}
+html[dir="rtl"] .welcome-description {
+  line-height: 1.9;
+}
+html[dir="rtl"] :is(.dialog-intro, .service-detail, .check-label) {
+  line-height: 1.9;
+}
+:is(
+  .coding-path,
+  .coding-output,
+  .json-view,
+  .flow-node-id,
+  pre,
+  code,
+  bdi,
+  kbd
+) {
+  unicode-bidi: isolate;
+}
+@media (max-width: 960px) {
+  html[dir="rtl"] .inspector {
+    right: auto;
+    left: 0;
+  }
+}
+@media (max-width: 700px) {
+  html[dir="rtl"] .sidebar {
+    left: auto;
+    right: 0;
+    transform: translateX(101%);
+  }
+  html[dir="rtl"] .app-shell.sidebar-open .sidebar {
+    transform: translateX(0);
+  }
+  .topbar-actions {
+    gap: 6px;
+  }
+  .language-switch {
+    gap: 0;
+  }
+  .language-switch > span:not(.sr-only) {
+    display: none;
+  }
+  .language-switch select {
+    font-size: 11px;
+    max-width: 88px;
+  }
+  .topbar .connection-button {
+    max-width: 140px;
+  }
+  .connection-button #connection-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+html[dir="rtl"] :is(.new-chat, .local-tabs, .local-form-grid) {
+  direction: rtl;
 }

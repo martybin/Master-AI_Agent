@@ -81,6 +81,8 @@ def test_coding_request_asks_access_without_touching_files_or_using_model(api, n
     result = next(e for e in send(api, cid) if e["type"] == "complete")
     request = result["message"]["access_request"]
     assert request["status"] == "pending" and request["mode"] == "system"
+    assert result["message"]["ui_notice"] == "coding_access"
+    assert request["ui_reason"] == "coding_access"
     assert api.app.state.tools.permission(cid)["mode"] == "off"
     assert not api.app.state.tools.coding.projects(cid)
     assert not network.calls

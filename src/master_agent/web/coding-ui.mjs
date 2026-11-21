@@ -1,3 +1,4 @@
+import { setText, msg, number } from "./i18n.mjs?v=0.4.3";
 // Owner controls: no page/model text can approve a permission request.
 export function mountCoding({
   api,
@@ -15,10 +16,12 @@ export function mountCoding({
     selectedProject = null;
   function fail(error) {
     showError(error);
-    $("coding-error").textContent =
+    setText(
+      $("coding-error"),
       typeof error.detail === "string"
         ? error.detail
-        : "Could not complete the operation. Check the project status and access permissions.";
+        : "Could not complete the operation. Check the project status and access permissions.",
+    );
     $("coding-error").hidden = false;
   }
   async function openAccess(record, { pendingOnly = false } = {}) {
@@ -26,7 +29,11 @@ export function mountCoding({
     try {
       currentRequest = await api(`/local/access-requests/${record.id}`);
       if (pendingOnly && currentRequest.status !== "pending") return;
-      $("access-reason").textContent = currentRequest.reason;
+      setText(
+        $("access-reason"),
+        currentRequest.reason,
+        currentRequest.ui_reason === "coding_access",
+      );
       $("access-folder").value = currentRequest.workspace;
       $("access-level").value = currentRequest.mode;
       $("access-confirm").checked = false;
@@ -34,13 +41,15 @@ export function mountCoding({
       $("access-approve").disabled = currentRequest.status !== "pending";
       $("access-reject").disabled = currentRequest.status !== "pending";
       $("access-resume").hidden = currentRequest.status !== "approved";
-      $("access-status").textContent =
+      setText(
+        $("access-status"),
         {
           pending: "Waiting for your approval",
           approved: "Access approved",
           rejected: "Access denied",
           superseded: "Superseded by a newer request",
-        }[currentRequest.status] || currentRequest.status;
+        }[currentRequest.status] || currentRequest.status,
+      );
       showDialog("coding-access-dialog");
     } catch (error) {
       showError(error);
@@ -66,10 +75,12 @@ export function mountCoding({
       $("coding-access-dialog").close();
       await resume(result);
     } catch (error) {
-      $("access-error").textContent =
+      setText(
+        $("access-error"),
         typeof error.detail === "string"
           ? error.detail
-          : "Access was not approved. Check the confirmation, folder, and chat status.";
+          : "Access was not approved. Check the confirmation, folder, and chat status.",
+      );
       $("access-error").hidden = false;
     } finally {
       $("access-approve").disabled = false;
@@ -135,12 +146,19 @@ export function mountCoding({
       for (const project of projects) {
         const card = el("article", "coding-project");
         card.append(
-          el("h3", "", project.name),
+          el("h3", "", project.name, false),
           el("p", "coding-path", project.path),
           el(
             "p",
             "service-detail",
-            `${project.files.length} files · ${project.status === "created" ? "Files created" : "Incomplete — review required"}`,
+            msg("{count} files · {status}", {
+              count: number(project.files.length),
+              status: msg(
+                project.status === "created"
+                  ? "Files created"
+                  : "Incomplete — review required",
+              ),
+            }),
           ),
         );
         const run = project.last_run;

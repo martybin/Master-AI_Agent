@@ -6,9 +6,16 @@ test("permission dialog is explicit, restores pending requests and never self-ap
   const nodes = new Map();
   const previous = globalThis.document;
   globalThis.document = {
+    createTextNode: (value) => ({ nodeValue: value }),
     getElementById(id) {
       if (!nodes.has(id))
-        nodes.set(id, { addEventListener() {}, checked: true });
+        nodes.set(id, {
+          addEventListener() {},
+          checked: true,
+          replaceChildren(node) {
+            this.textContent = node.nodeValue;
+          },
+        });
       return nodes.get(id);
     },
   };

@@ -10,8 +10,8 @@
     />
     <title>BisCode — Local AI Agent Builder</title>
     <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/assets/app.css?v=0.4.1" />
-    <script type="module" src="/assets/app.js?v=0.4.1"></script>
+    <link rel="stylesheet" href="/assets/app.css?v=0.4.3" />
+    <script type="module" src="/assets/app.js?v=0.4.3"></script>
   </head>
   <body>
     <a class="skip-link" href="#prompt">Skip to message input</a>
@@ -103,6 +103,14 @@
             ><span id="chat-title" dir="auto">New chat</span>
           </div>
           <div class="topbar-actions">
+            <label class="language-switch">
+              <span class="sr-only">Interface language</span>
+              <span data-icon="globe" aria-hidden="true"></span>
+              <select id="interface-language" aria-label="Interface language">
+                <option value="en" translate="no">English</option>
+                <option value="fa" translate="no">فارسی</option>
+              </select>
+            </label>
             <button class="connection-button" id="connection-button">
               <span class="status-dot" id="connection-dot"></span
               ><span id="connection-label">Connect workspace</span></button
@@ -207,14 +215,6 @@
                 ><span class="composer-separator"></span
                 ><span class="composer-hint">Enter to send</span>
               </div>
-              <button
-                type="button"
-                class="secondary-button cancel-run"
-                id="cancel-run"
-                hidden
-              >
-                Stop
-              </button>
               <button
                 type="submit"
                 class="send-button"
@@ -515,12 +515,22 @@
         </p>
         <p id="local-workspace" class="service-detail"></p>
         <form id="local-grant-form">
-          <label for="local-workspace-input">Allowed folder for this chat</label
-          ><input
-            id="local-workspace-input"
-            dir="ltr"
-            placeholder="/absolute/path/to/project"
-          />
+          <label for="local-workspace-input"
+            >Allowed folder for this chat</label
+          >
+          <div class="path-field">
+            <input
+              id="local-workspace-input"
+              dir="ltr"
+              placeholder="/absolute/path/to/project"
+            /><button
+              type="button"
+              class="secondary-button"
+              id="local-workspace-browse"
+            >
+              Browse
+            </button>
+          </div>
           <label for="local-access-mode">Access level</label
           ><select id="local-access-mode">
             <option value="off">Off</option>
@@ -765,8 +775,16 @@
       <p id="access-reason" class="dialog-intro"></p>
       <p id="access-status" class="service-detail"></p>
       <form id="access-form">
-        <label for="access-folder">Workspace folder</label
-        ><input id="access-folder" dir="ltr" required />
+        <label for="access-folder">Project folder</label>
+        <div class="path-field">
+          <input id="access-folder" dir="ltr" required /><button
+            type="button"
+            class="secondary-button"
+            id="access-browse"
+          >
+            Browse
+          </button>
+        </div>
         <label for="access-level">Access scope</label
         ><select id="access-level">
           <option value="workspace">Read and write files in this folder</option>
@@ -774,8 +792,8 @@
         </select>
         <p class="service-detail">
           Access applies to this chat for 4 hours. Commands run with your OS
-          user permissions, outside a sandbox. Use Stop to interrupt the current
-          task.
+          user permissions, outside a sandbox. While a task is running, the send
+          button becomes Stop.
         </p>
         <label class="check-label"
           ><input type="checkbox" id="access-confirm" required /><span
@@ -832,6 +850,67 @@
         </button>
       </div>
       <div id="coding-changes"></div>
+    </dialog>
+    <dialog
+      id="folder-picker"
+      class="dialog folder-picker"
+      aria-labelledby="folder-picker-title"
+    >
+      <header class="dialog-header">
+        <div>
+          <p class="eyebrow">BISCODE · PROJECT FOLDER</p>
+          <h2 id="folder-picker-title">Choose where to code</h2>
+        </div>
+        <button
+          class="icon-button"
+          data-close="folder-picker"
+          aria-label="Close folder picker"
+        >
+          <span data-icon="close"></span>
+        </button>
+      </header>
+      <p class="dialog-intro">
+        Open a folder, or select a file inside the project. Coding runs in that
+        folder with the access you approve.
+      </p>
+      <p id="folder-picker-path" class="coding-path" dir="ltr"></p>
+      <label class="check-label"
+        ><input type="checkbox" id="folder-hidden" /><span
+          >Show hidden folders</span
+        ></label
+      >
+      <div class="coding-actions">
+        <button type="button" class="secondary-button" id="folder-up">
+          Up
+        </button>
+        <button type="button" class="secondary-button" id="folder-home">
+          Home
+        </button>
+        <button type="button" class="secondary-button" id="folder-system">
+          Open my files
+        </button>
+        <button type="button" class="primary-button" id="folder-use">
+          Use this folder
+        </button>
+      </div>
+      <p id="folder-picker-error" class="form-error" role="alert" hidden></p>
+      <div id="folder-picker-list" class="folder-list" aria-live="polite"></div>
+      <form id="folder-create-form" class="folder-create-form">
+        <label for="folder-name">New folder</label>
+        <div class="path-field">
+          <input
+            id="folder-name"
+            name="folder-name"
+            placeholder="Folder name"
+            maxlength="150"
+            dir="auto"
+            required
+          />
+          <button type="submit" class="secondary-button" id="folder-create">
+            Create folder
+          </button>
+        </div>
+      </form>
     </dialog>
   </body>
 </html>

@@ -1,5 +1,15 @@
-import { mountLocalAgent } from "./local-ui.mjs?v=0.4.1";
-import { mountCoding } from "./coding-ui.mjs?v=0.4.1";
+import { mountFolderPicker } from "./folder-picker.mjs?v=0.4.3";
+import {
+  initializeLanguage,
+  setText,
+  setAttr,
+  textNode,
+  msg,
+  number,
+  dateTime,
+} from "./i18n.mjs?v=0.4.3";
+import { mountLocalAgent } from "./local-ui.mjs?v=0.4.3";
+import { mountCoding } from "./coding-ui.mjs?v=0.4.3";
 import {
   statuses,
   nodeKinds,
@@ -8,7 +18,7 @@ import {
   EventParser,
   errorMessage,
   nodeDetail,
-} from "./ui-utils.mjs?v=0.4.1";
+} from "./ui-utils.mjs?v=0.4.3";
 
 const $ = (id) => document.getElementById(id);
 const shapes = {
@@ -37,6 +47,7 @@ const shapes = {
   close: '<path d="m6 6 12 12M6 18 18 6"/>',
   menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
   model: '<path d="m12 2 9 5-9 5-9-5Zm-9 10 9 5 9-5M3 17l9 5 9-5"/>',
+  stop: '<rect x="5" y="5" width="14" height="14" rx="2.5" fill="currentColor" stroke="none"/>',
   play: '<path d="m8 4 12 8-12 8Z"/>',
   pause: '<path d="M8 4v16M16 4v16"/>',
   check: '<path d="m5 12 4 4L19 6"/>',
@@ -67,11 +78,17 @@ function hydrateIcons(root = document) {
       node.replaceChildren(...icon(node.dataset.icon).childNodes),
     );
 }
-function el(tag, className, text) {
+function el(tag, className, text, translate = true) {
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (text !== undefined) {
-    node.textContent = text;
+    setText(
+      node,
+      text,
+      translate &&
+        !["pre", "code"].includes(tag) &&
+        !["coding-path", "flow-node-id"].includes(className),
+    );
     node.dir = "auto";
   }
   return node;
@@ -80,7 +97,7 @@ function button(text, action, className = "secondary-button", glyph) {
   const node = el("button", className);
   node.type = "button";
   if (glyph) node.append(icon(glyph));
-  node.append(document.createTextNode(text));
+  node.append(textNode(text, !className.includes("history-item")));
   node.addEventListener("click", action);
   return node;
 }
@@ -121,14 +138,10 @@ const state = {
   deletingChat: null,
 };
 let toastTimer, elapsedTimer, pollTimer, codingUI;
-const formatNumber = (value) => new Intl.NumberFormat("en-US").format(value);
-const time = (value) =>
-  new Intl.DateTimeFormat("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
+const formatNumber = number;
+const time = (value) => dateTime(value, { hour: "2-digit", minute: "2-digit" });
 function toast(text) {
-  $("toast").textContent = text;
+  setText($("toast"), text);
   $("toast").hidden = false;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => ($("toast").hidden = true), 5500);
@@ -175,20 +188,36 @@ function inspector(open) {
   $("inspector").hidden = !open;
   $("app-shell").classList.toggle("with-inspector", open);
 }
+function renderSendButton(busy) {
+  const send = $("send-button");
+  send.classList.toggle("is-stop", busy);
+  send.type = busy ? "button" : "submit";
+  send.disabled = false;
+  setAttr(send, "aria-label", busy ? "Stop" : "Send message");
+  send.replaceChildren(icon(busy ? "stop" : "spark"));
+  if (!busy) send.append(el("span", "", "Send"));
+}
 function setBusy(busy) {
   state.busy = busy;
-  $("send-button").disabled = busy;
+  renderSendButton(busy);
   $("build-target").disabled = busy;
-  $("cancel-run").hidden = !busy;
   $("build-progress").hidden = !busy;
   clearInterval(elapsedTimer);
   if (busy) {
     const started = Date.now();
-    $("elapsed").textContent = "0:00";
+    setText($("elapsed"), "0:00");
     elapsedTimer = setInterval(() => {
       const seconds = Math.floor((Date.now() - started) / 1000);
-      $("elapsed").textContent =
-        `${formatNumber(Math.floor(seconds / 60))}:${formatNumber(seconds % 60).padStart(2, "0")}`;
+      setText(
+        $("elapsed"),
+        msg("{minutes}:{seconds}", {
+          minutes: number(Math.floor(seconds / 60)),
+          seconds: number(seconds % 60, {
+            minimumIntegerDigits: 2,
+            useGrouping: false,
+          }),
+        }),
+      );
     }, 1000);
   }
 }
@@ -198,9 +227,15 @@ function scrollBottom() {
   });
 }
 function setStage(stage, attempt) {
-  $("progress-label").textContent =
-    (stageLabels[stage] || stageLabels.thinking) +
-    (attempt > 1 ? ` (attempt ${formatNumber(attempt)})` : "");
+  setText(
+    $("progress-label"),
+    attempt > 1
+      ? msg("{stage} (attempt {attempt})", {
+          stage: msg(stageLabels[stage] || stageLabels.thinking),
+          attempt: formatNumber(attempt),
+        })
+      : stageLabels[stage] || stageLabels.thinking,
+  );
 }
 function renderHistory() {
   const container = $("chat-history");
@@ -241,7 +276,7 @@ function renderHistory() {
     item.title = chat.title;
     if (state.chat?.id === chat.id) item.setAttribute("aria-current", "page");
     const text = item.lastChild;
-    text.replaceWith(el("span", "history-title", text.textContent));
+    text.replaceWith(el("span", "history-title", text.textContent, false));
     const actions = el("div", "history-actions");
     const pin = button(
       "",
@@ -262,25 +297,43 @@ function renderHistory() {
       "icon-button history-action",
       "pin",
     );
-    pin.title = chat.pinned ? "Unpin chat" : "Pin chat";
-    pin.setAttribute("aria-label", `${pin.title}: ${chat.title}`);
+    setAttr(pin, "title", chat.pinned ? "Unpin chat" : "Pin chat");
+    setAttr(
+      pin,
+      "aria-label",
+      msg("{action}: {title}", {
+        action: msg(chat.pinned ? "Unpin chat" : "Pin chat"),
+        title: chat.title,
+      }),
+    );
     pin.setAttribute("aria-pressed", String(Boolean(chat.pinned)));
     const remove = button(
       "",
       () => {
         state.deletingChat = chat.id;
-        $("delete-chat-title").textContent = chat.title;
+        setText($("delete-chat-title"), chat.title, false);
         $("delete-chat-error").hidden = true;
         showDialog("delete-chat-dialog");
       },
       "icon-button history-action delete-chat",
       "trash",
     );
-    remove.title = "Delete chat";
-    remove.setAttribute("aria-label", `Delete chat: ${chat.title}`);
+    setAttr(remove, "title", "Delete chat");
+    setAttr(
+      remove,
+      "aria-label",
+      msg("{action}: {title}", {
+        action: msg("Delete chat"),
+        title: chat.title,
+      }),
+    );
     remove.disabled = chat.status === "busy" || state.busyChat === chat.id;
     if (remove.disabled)
-      remove.title = "Stop the current task before deleting this chat";
+      setAttr(
+        remove,
+        "title",
+        "Stop the current task before deleting this chat",
+      );
     actions.append(pin, remove);
     row.append(item, actions);
     container.append(row);
@@ -291,7 +344,7 @@ async function refreshLists() {
   const [history, builds] = await Promise.all([api("/chats"), api("/builds")]);
   state.chats = history.chats;
   state.builds = builds.builds;
-  $("workflow-count").textContent = formatNumber(state.builds.length);
+  setText($("workflow-count"), formatNumber(state.builds.length));
   renderHistory();
 }
 function newChat() {
@@ -299,7 +352,7 @@ function newChat() {
   state.chat = null;
   state.selectedBuild = null;
   safelyStore("master-chat", null);
-  $("chat-title").textContent = "New chat";
+  setText($("chat-title"), "New chat");
   $("welcome").hidden = false;
   $("messages").replaceChildren();
   $("prompt").value = "";
@@ -313,7 +366,7 @@ async function loadChat(id) {
   state.chat = chat;
   $("build-target").value = chat.target || "auto";
   safelyStore("master-chat", id);
-  $("chat-title").textContent = chat.title;
+  setText($("chat-title"), chat.title, false);
   sidebar(false);
   renderHistory();
   renderMessages();
@@ -371,10 +424,18 @@ function renderMessages() {
     content.dir = "auto";
     if (message.status === "pending") {
       const dots = el("span", "typing-dots");
-      dots.setAttribute("aria-label", "Preparing a response");
+      setAttr(dots, "aria-label", "Preparing a response");
       for (let i = 0; i < 3; i++) dots.append(el("i"));
       content.append(dots);
-    } else if (message.role === "assistant")
+    } else if (
+      message.role === "assistant" &&
+      message.ui_notice === "coding_access"
+    )
+      setText(
+        content,
+        "Review and approve the folder and scope before local coding. Select Approve & continue to resume this request.",
+      );
+    else if (message.role === "assistant")
       renderMarkdown(content, message.content);
     else content.textContent = message.content;
     body.append(content);
@@ -391,12 +452,20 @@ function renderMessages() {
       card.append(icon("workflow"));
       const text = el("div");
       text.append(
-        el("strong", "", summary?.name || "Workflow ready for review"),
+        el(
+          "strong",
+          "",
+          summary?.name || "Workflow ready for review",
+          !summary,
+        ),
         el(
           "small",
           "",
           summary
-            ? `${formatNumber(summary.node_count)} nodes · ${statuses[summary.status] || summary.status}`
+            ? msg("{count} nodes · {status}", {
+                count: formatNumber(summary.node_count),
+                status: msg(statuses[summary.status] || summary.status),
+              })
             : "Open workflow details",
         ),
       );
@@ -411,8 +480,8 @@ function renderMessages() {
         "icon-button",
         "copy",
       );
-      copy.title = "Copy response";
-      copy.setAttribute("aria-label", "Copy response");
+      setAttr(copy, "title", "Copy response");
+      setAttr(copy, "aria-label", "Copy response");
       actions.append(
         copy,
         el("span", "message-time", time(message.created_at)),
@@ -424,6 +493,9 @@ function renderMessages() {
   }
   scrollBottom();
 }
+function rawEl(tag, className, text) {
+  return el(tag, className, text, false);
+}
 function renderMarkdown(root, text) {
   root.classList.add("markdown");
   function inline(parent, value) {
@@ -433,7 +505,7 @@ function renderMarkdown(root, text) {
       parent.append(document.createTextNode(value.slice(offset, match.index)));
       const bold = match[0].startsWith("**");
       parent.append(
-        el(
+        rawEl(
           bold ? "strong" : "code",
           "",
           match[0].slice(bold ? 2 : 1, bold ? -2 : -1),
@@ -448,7 +520,7 @@ function renderMarkdown(root, text) {
     list = null;
   const flush = () => {
     if (paragraph.length) {
-      const p = el("p");
+      const p = rawEl("p");
       inline(p, paragraph.join("\n"));
       root.append(p);
       paragraph = [];
@@ -462,8 +534,8 @@ function renderMarkdown(root, text) {
       const code = [];
       while (++i < lines.length && !lines[i].trimStart().startsWith("```"))
         code.push(lines[i]);
-      const pre = el("pre");
-      pre.append(el("code", "", code.join("\n")));
+      const pre = rawEl("pre");
+      pre.append(rawEl("code", "", code.join("\n")));
       root.append(pre);
       continue;
     }
@@ -472,10 +544,10 @@ function renderMarkdown(root, text) {
       flush();
       const tag = item[1] ? "UL" : "OL";
       if (!list || list.tagName !== tag) {
-        list = el(tag.toLowerCase());
+        list = rawEl(tag.toLowerCase());
         root.append(list);
       }
-      const li = el("li");
+      const li = rawEl("li");
       inline(li, item[3]);
       list.append(li);
     } else {
@@ -483,7 +555,7 @@ function renderMarkdown(root, text) {
       if (!line.trim()) flush();
       else if (/^#{1,4}\s/.test(line)) {
         flush();
-        const heading = el("p", "markdown-heading");
+        const heading = rawEl("p", "markdown-heading");
         inline(heading, line.replace(/^#{1,4}\s+/, ""));
         root.append(heading);
       } else paragraph.push(line);
@@ -540,14 +612,23 @@ function renderFlow(ir) {
         "",
         (nodeKinds[node.kind] || [node.node_type || node.kind])[0],
       ),
-      el("small", "", nodeDetail(node)),
+      el(
+        "small",
+        "",
+        node.kind === "schedule"
+          ? msg("Every {minutes} minutes", { minutes: node.every_minutes })
+          : node.kind === "ollama_chat"
+            ? msg("Input: {path}", { path: node.input_path })
+            : nodeDetail(node),
+        ["manual", "schedule", "ollama_chat"].includes(node.kind),
+      ),
       el("small", "flow-node-id", node.id),
     );
     if (node.kind === "ollama_chat") {
       const details = el("details", "node-instructions");
       details.append(
         el("summary", "", "Model instructions"),
-        el("p", "", node.system_prompt),
+        el("p", "", node.system_prompt, false),
       );
       info.append(details);
     }
@@ -607,11 +688,14 @@ function renderInspector() {
   const heading = el("section", "blueprint-heading");
   heading.append(
     badge(build.status),
-    el("h2", "", build.ir.name),
+    el("h2", "", build.ir.name, false),
     el(
       "p",
       "",
-      `${formatNumber(build.ir.nodes.length)} nodes · ${formatNumber(build.ir.edges.length)} connections · n8n workflow`,
+      msg("{nodes} nodes · {edges} connections · n8n workflow", {
+        nodes: formatNumber(build.ir.nodes.length),
+        edges: formatNumber(build.ir.edges.length),
+      }),
     ),
   );
   root.append(heading);
@@ -789,14 +873,14 @@ async function openReview(buildId) {
   root.replaceChildren();
   const box = el("div", "review-summary");
   box.append(
-    el("strong", "", review.remote_workflow.name),
+    el("strong", "", review.remote_workflow.name, false),
     el("p", "", "Activating this workflow can start its webhook or schedule."),
   );
   const destinations = review.remote_workflow.nodes
     .filter((node) => node.parameters.url)
     .map((node) => node.parameters.url);
   for (const url of destinations)
-    box.append(el("p", "", `Request destination: ${url}`));
+    box.append(el("p", "", msg("Request destination: {url}", { url })));
   root.append(box);
   for (const warning of review.warnings)
     root.append(
@@ -806,7 +890,10 @@ async function openReview(buildId) {
     el(
       "p",
       "review-detail",
-      `Version: ${review.remote_workflow.versionId}\nSHA-256: ${review.workflow_sha256}`,
+      msg("Version: {version}\nSHA-256: {hash}", {
+        version: review.remote_workflow.versionId,
+        hash: review.workflow_sha256,
+      }),
     ),
   );
   const details = el("details");
@@ -845,7 +932,11 @@ function renderServices() {
   }
   if (state.config)
     root.append(
-      el("p", "service-detail", `Selected model: ${state.config.model}`),
+      el(
+        "p",
+        "service-detail",
+        msg("Selected model: {model}", { model: state.config.model }),
+      ),
     );
 }
 async function refreshSystem() {
@@ -855,14 +946,17 @@ async function refreshSystem() {
   ]);
   state.config = config;
   state.system = system;
-  $("model-label").textContent = config.model;
-  $("profile-state").textContent = "Workspace connected";
+  setText($("model-label"), config.model, false);
+  setText($("profile-state"), "Workspace connected");
   const ready = system.ollama?.model_installed;
-  $("connection-label").textContent = ready
-    ? system.n8n?.api_authenticated
-      ? "Ollama & n8n connected"
-      : "Model ready · n8n not configured"
-    : "Model unavailable";
+  setText(
+    $("connection-label"),
+    ready
+      ? system.n8n?.api_authenticated
+        ? "Ollama & n8n connected"
+        : "Model ready · n8n not configured"
+      : "Model unavailable",
+  );
   $("connection-dot").className =
     `status-dot ${ready && system.n8n?.api_authenticated ? "connected" : "partial"}`;
   $("logout-button").hidden = false;
@@ -894,7 +988,7 @@ async function connect(event) {
     state.key = "";
     state.config = null;
     state.system = null;
-    $("connection-error").textContent = errorMessage(error);
+    setText($("connection-error"), errorMessage(error));
     $("connection-error").hidden = false;
   } finally {
     $("connect-button").disabled = false;
@@ -916,11 +1010,11 @@ function logout() {
   clearTimeout(pollTimer);
   setBusy(false);
   newChat();
-  $("workflow-count").textContent = "—";
-  $("model-label").textContent = "Ollama · Local";
-  $("connection-label").textContent = "Connect workspace";
+  setText($("workflow-count"), "—");
+  setText($("model-label"), "Ollama · Local");
+  setText($("connection-label"), "Connect workspace");
   $("connection-dot").className = "status-dot";
-  $("profile-state").textContent = "Local model connection";
+  setText($("profile-state"), "Local model connection");
   $("logout-button").hidden = true;
   renderServices();
   $("settings-dialog").close();
@@ -1045,19 +1139,29 @@ async function submit(event, resume = null) {
           );
           state.chat.messages.push(event.user, event.assistant);
           state.chat.status = "busy";
-          $("chat-title").textContent = content.slice(0, 48);
+          setText($("chat-title"), content.slice(0, 48), false);
           renderMessages();
         }
       } else if (event.type === "permission_required") {
         pendingAccess = event.access_request;
-        $("progress-label").textContent = "Waiting for your access approval…";
+        setText($("progress-label"), "Waiting for your access approval…");
       } else if (event.type === "stage") {
         setStage(event.stage, event.attempt);
         if (event.tool)
-          $("progress-label").textContent = "Running tool: " + event.tool;
+          setText(
+            $("progress-label"),
+            msg("Running tool: {tool}", { tool: event.tool }),
+          );
         if (event.step)
-          $("progress-label").textContent +=
-            " · Step " + formatNumber(event.step);
+          setText(
+            $("progress-label"),
+            msg("{stage} · Step {step}", {
+              stage: event.tool
+                ? msg("Running tool: {tool}", { tool: event.tool })
+                : msg(stageLabels[event.stage] || stageLabels.thinking),
+              step: formatNumber(event.step),
+            }),
+          );
       } else if (event.type === "complete" || event.type === "failed") {
         finished = true;
         pendingAccess = event.message.access_request || pendingAccess;
@@ -1069,7 +1173,7 @@ async function submit(event, resume = null) {
           state.chat.messages.push(event.message);
           if (event.build) {
             state.chat.title = event.build.ir.name;
-            $("chat-title").textContent = event.build.ir.name;
+            setText($("chat-title"), event.build.ir.name, false);
             state.selectedBuild = event.build;
             state.builds.unshift({
               id: event.build.id,
@@ -1258,11 +1362,14 @@ $("all-workflows").addEventListener("click", async () => {
       );
       const info = el("div");
       info.append(
-        el("strong", "", build.name),
+        el("strong", "", build.name, false),
         el(
           "small",
           "",
-          `${formatNumber(build.node_count)} nodes · ${time(build.updated_at)}`,
+          msg("{count} nodes · {time}", {
+            count: formatNumber(build.node_count),
+            time: time(build.updated_at),
+          }),
         ),
       );
       item.append(icon("workflow"), info, badge(build.status));
@@ -1333,10 +1440,12 @@ $("delete-chat-form").addEventListener("submit", async (event) => {
     toast("Chat deleted.");
   } catch (error) {
     if (error.message !== "session_changed") {
-      $("delete-chat-error").textContent =
+      setText(
+        $("delete-chat-error"),
         error.status === 409
           ? "Stop the current task before deleting this chat."
-          : errorMessage(error);
+          : errorMessage(error),
+      );
       $("delete-chat-error").hidden = false;
     }
   } finally {
@@ -1395,6 +1504,7 @@ codingUI = mountCoding({
     await submit(null, { ...record, content: original.content });
   },
 });
+mountFolderPicker({ api, el, button, showDialog, toast, requireConnection });
 $("build-target").addEventListener("change", async () => {
   if (!state.chat || !state.key) return;
   try {
@@ -1407,13 +1517,19 @@ $("build-target").addEventListener("change", async () => {
     showError(error);
   }
 });
-$("cancel-run").addEventListener("click", async () => {
+$("send-button").addEventListener("click", async (event) => {
+  if (!state.busy) return;
+  event.preventDefault();
   const id = state.busyChat || state.chat?.id;
   if (!id) return;
+  $("send-button").disabled = true;
   try {
     await api(`/chats/${id}/cancel`, { method: "POST" });
   } catch (error) {
     showError(error);
+  } finally {
+    if (state.busy) $("send-button").disabled = false;
   }
 });
+initializeLanguage();
 boot();

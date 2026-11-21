@@ -398,6 +398,8 @@ class ChatService:
                     ),
                 )
                 pending_access = result["access_request"]
+                pending_access["ui_reason"] = "coding_access"
+                self.tools.store.put("access_requests", pending_access["id"], pending_access)
                 message = self.history.finish_turn(
                     chat_id,
                     assistant_id,
@@ -405,6 +407,7 @@ class ChatService:
                     "Select Approve & continue to resume this request.",
                     access_request=pending_access,
                     project_id=project_id,
+                    ui_notice="coding_access",
                 )
                 emit({"type": "permission_required", "access_request": pending_access})
                 emit({"type": "complete", "message": message, "build": None})
