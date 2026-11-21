@@ -1,9 +1,9 @@
-.PHONY: setup run test test-ui check doctor n8n smoke smoke-local
+.PHONY: setup run test test-ui check doctor n8n smoke smoke-local smoke-coding
 setup:
 	uv sync --group dev
 	uv run python scripts/bootstrap.py
 run:
-	uv run master-local serve
+	uv run biscode serve
 test:
 	uv run pytest -q
 test-ui:
@@ -19,3 +19,5 @@ smoke:
 	uv run python scripts/smoke_ollama.py
 smoke-local:
 	uv run python scripts/smoke_local.py
+smoke-coding:
+	uv run python scripts/smoke_coding.py

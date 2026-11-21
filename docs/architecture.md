@@ -1,5 +1,9 @@
 # Architecture and API contract
 
+BisCode 0.4 adds owner-approved local coding and Python agent projects alongside
+this n8n pipeline. See [coding, permissions and continuation](coding.md). The
+existing compiler, inactive deployment and explicit activation contract remain.
+
 ## Scope
 
 Master Local Agent turns natural language into reviewed n8n workflows and can
