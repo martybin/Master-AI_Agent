@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     local_workspace: Path = Field(default_factory=Path.cwd)
     local_vault_key: Path | None = None
     local_max_steps: int = Field(default=10, ge=1, le=40)
+    coding_max_steps: int = Field(default=20, ge=4, le=60)
     local_plugin_modules: list[str] = Field(default_factory=list)
 
     @field_validator("ollama_base_url", "n8n_base_url", "n8n_ollama_base_url")

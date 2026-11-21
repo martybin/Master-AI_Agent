@@ -42,17 +42,33 @@ class ChatRepository:
                                 (json.dumps(message), message_id),
                             )
 
-    def create(self) -> dict:
+    def create(self, target="auto") -> dict:
         record = {
             "id": str(uuid4()),
             "title": "گفتگوی تازه",
             "status": "idle",
+            "target": target,
             "created_at": now(),
             "updated_at": now(),
         }
         with self.builds.connect() as db:
             db.execute("INSERT INTO chats(id,data) VALUES(?,?)", (record["id"], json.dumps(record)))
         return {**record, "messages": []}
+
+    def set_target(self, chat_id, target):
+        if target not in {"auto", "n8n", "python", "code"}:
+            raise StateConflict("Invalid build target")
+        with self.builds.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute("SELECT data FROM chats WHERE id=?", (chat_id,)).fetchone()
+            if not row:
+                raise NotFound("Chat not found")
+            chat = json.loads(row[0])
+            if chat["status"] != "idle":
+                raise StateConflict("Wait for the current task before changing build target")
+            chat.update(target=target, updated_at=now())
+            db.execute("UPDATE chats SET data=? WHERE id=?", (json.dumps(chat), chat_id))
+        return self.get(chat_id)
 
     def list(self) -> list[dict]:
         with self.builds.connect() as db:
@@ -134,6 +150,8 @@ class ChatRepository:
         build_id: str | None = None,
         error_code: str | None = None,
         title: str | None = None,
+        project_id: str | None = None,
+        access_request: dict | None = None,
     ) -> dict:
         with self.builds.connect() as db:
             db.execute("BEGIN IMMEDIATE")
@@ -148,6 +166,8 @@ class ChatRepository:
                 build_id=build_id,
                 error_code=error_code,
                 status="failed" if error_code else "complete",
+                project_id=project_id,
+                access_request=access_request,
             )
             db.execute(
                 "UPDATE chat_messages SET data=? WHERE id=?", (json.dumps(message), message_id)

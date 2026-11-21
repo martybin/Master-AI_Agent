@@ -6,10 +6,12 @@ import json
 import shutil
 from pathlib import Path
 
+from master_agent import __version__
+
 
 def main():
-    parser = argparse.ArgumentParser(description="Master Local Agent — native host runtime")
-    parser.add_argument("--version", action="version", version="Master Local Agent 0.3.0")
+    parser = argparse.ArgumentParser(description="BisCode — local coding and n8n agent builder")
+    parser.add_argument("--version", action="version", version=f"BisCode {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
     serve = sub.add_parser("serve", help="Run the local UI, tools and integration workers")
     serve.add_argument("--workspace", type=Path)

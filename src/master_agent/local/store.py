@@ -26,7 +26,8 @@ class LocalStore:
                 }
                 existing = (
                     db.execute(
-                        "SELECT count(*) FROM local_records WHERE bucket='connections'"
+                        "SELECT count(*) FROM local_records "
+                        "WHERE bucket IN ('connections','code_changes')"
                     ).fetchone()[0]
                     if "local_records" in tables
                     else 0
@@ -63,12 +64,28 @@ class LocalStore:
                 "TEXT NOT NULL, event_key TEXT NOT NULL, data TEXT NOT NULL, "
                 "UNIQUE(connection,event_key))"
             )
+            sample = db.execute(
+                "SELECT data FROM local_records WHERE bucket IN ('connections','code_changes') "
+                "UNION ALL SELECT data FROM local_inbox LIMIT 1"
+            ).fetchone()
+            if sample:
+                self.unseal(json.loads(sample[0])["sealed"])
             for record_id, raw in db.execute("SELECT id,data FROM local_inbox").fetchall():
                 record = json.loads(raw)
                 if record["status"] == "delivering":
                     record.update(status="uncertain", phase="interrupted_delivery")
                     db.execute(
                         "UPDATE local_inbox SET data=? WHERE id=?", (json.dumps(record), record_id)
+                    )
+            for record_id, raw in db.execute(
+                "SELECT id,data FROM local_records WHERE bucket='code_runs'"
+            ).fetchall():
+                record = json.loads(raw)
+                if record["status"] == "running":
+                    record.update(status="interrupted", finished_at=now())
+                    db.execute(
+                        "UPDATE local_records SET data=? WHERE bucket='code_runs' AND id=?",
+                        (json.dumps(record), record_id),
                     )
 
     def seal(self, value: dict) -> str:

@@ -13,13 +13,14 @@ import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Literal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from pydantic import Field, StrictBool, ValidationError
 
 from master_agent.compiler import compile_ir, digest
 from master_agent.config import Settings
 from master_agent.ir import ClosedModel, WorkflowIR
+from master_agent.local.access import AccessContext, AccessRequest, AccessRequired, request_access
 from master_agent.local.native import NativeCatalog, NativeSpec
 from master_agent.local.store import LocalStore
 from master_agent.repository import StateConflict
@@ -30,6 +31,7 @@ class GrantInput(ClosedModel):
     mode: Literal["off", "workspace", "system"] = "workspace"
     confirm: StrictBool = False
     hours: int = Field(default=4, ge=1, le=24)
+    workspace: str | None = None
 
 
 class PathArgs(ClosedModel):
@@ -210,9 +212,30 @@ class Tools:
                 self.deploy,
             ),
         ]:
-            self.register(name, description, schema, scope, handler)
+            self.register(
+                name,
+                description,
+                schema,
+                scope,
+                handler,
+                contextual=name.startswith("files.")
+                or name in {"terminal.exec", "catalog.import_file", "system.inspect"},
+            )
+        self.register(
+            "access.request",
+            "Request owner permission for files/commands; NEVER "
+            "grants access. Pause until owner approves in UI.",
+            AccessRequest,
+            "none",
+            lambda a, ctx: request_access(self, ctx.chat_id, a),
+            contextual=True,
+        )
+        from master_agent.local.coding import Coding
 
-    def register(self, name, description, schema, scope, handler):
+        self.coding = Coding(self)
+        self.coding.register()
+
+    def register(self, name, description, schema, scope, handler, *, contextual=False):
         if name in self.entries or scope not in {"none", "workspace", "system"}:
             raise ValueError("Invalid or duplicate tool registration")
         self.entries[name] = {
@@ -221,6 +244,7 @@ class Tools:
             "schema": schema,
             "scope": scope,
             "handler": handler,
+            "contextual": contextual,
         }
 
     def load_plugins(self, modules):
@@ -228,7 +252,7 @@ class Tools:
             importlib.import_module(module).register(self)
             self.store.audit("plugin.load", "complete", module=module)
 
-    def manifest(self):
+    def manifest(self, target=None):
         return [
             {
                 "name": e["name"],
@@ -237,16 +261,22 @@ class Tools:
                 "parameters": e["schema"].model_json_schema(),
             }
             for e in self.entries.values()
+            if target not in {"python", "code"} or e["name"] != "files.write"
+            if target not in {"python", "code"}
+            or not e["name"].startswith(("catalog.", "workflow.", "n8n."))
         ]
 
     def grant(self, chat_id: str, data: GrantInput):
         if data.mode == "system" and data.confirm is not True:
             raise StateConflict("Explicit owner confirmation is required for system access")
+        workspace = Path(data.workspace or self.settings.local_workspace).expanduser().resolve()
+        if data.mode != "off" and not workspace.is_dir():
+            raise StateConflict("Choose an existing local workspace folder")
         record = {
             "chat_id": chat_id,
             "mode": data.mode,
             "expires_at": (datetime.now(UTC) + timedelta(hours=data.hours)).isoformat(),
-            "workspace": str(self.settings.local_workspace.resolve()),
+            "workspace": str(workspace),
         }
         self.store.put("grants", chat_id, record)
         self.store.audit("grant.set", "complete", chat_id=chat_id, mode=data.mode)
@@ -269,13 +299,13 @@ class Tools:
             or scope == "workspace"
             and mode not in {"workspace", "system"}
         ):
-            raise StateConflict(
-                "Owner access grant is required; enable it in the Local Agent panel"
-            )
-        return mode
+            raise AccessRequired(scope)
+        return AccessContext(
+            mode, self.permission(chat_id).get("workspace", self.settings.local_workspace), chat_id
+        )
 
     def resolve(self, path, mode):
-        root = self.settings.local_workspace.resolve()
+        root = Path(getattr(mode, "workspace", self.settings.local_workspace)).resolve()
         target = (root / Path(path)).resolve()
         if mode != "system" and not target.is_relative_to(root):
             raise StateConflict("Path is outside the granted workspace")
@@ -286,6 +316,10 @@ class Tools:
         }
         if (
             target in protected
+            or target.name == ".env"
+            or target.name.startswith(".env.")
+            and target.name != ".env.example"
+            or target.suffix in {".key", ".session"}
             or target.suffix in {".sqlite3", ".sqlite"}
             or ".git" in target.parts
         ):
@@ -296,21 +330,22 @@ class Tools:
         entry = self.entries.get(name)
         if not entry:
             raise StateConflict("Unknown tool; inspect the tool registry")
-        mode = self.authorize(chat_id, entry["scope"]) if entry["scope"] != "none" else "off"
+        mode = self.authorize(chat_id, entry["scope"])
         try:
             args = entry["schema"].model_validate(arguments)
-        except ValidationError:
-            raise StateConflict("Tool arguments do not match its published schema") from None
+        except ValidationError as exc:
+            errors = [
+                {"field": ".".join(map(str, e["loc"])), "reason": e["type"]} for e in exc.errors()
+            ]
+            raise StateConflict(
+                "Tool argument fields do not match the schema: " + json.dumps(errors)
+            ) from None
         self.store.audit(
             "tool.start", "running", chat_id=chat_id, tool=name, argument_keys=list(arguments)
         )
         started = time.monotonic()
         try:
-            params = (
-                (args, mode)
-                if name.startswith("files.") or name in {"terminal.exec", "catalog.import_file"}
-                else (args,)
-            )
+            params = (args, mode) if entry["contextual"] else (args,)
             if inspect.iscoroutinefunction(entry["handler"]):
                 result = await entry["handler"](*params)
             else:
@@ -329,15 +364,22 @@ class Tools:
         except asyncio.CancelledError:
             self.store.audit("tool.finish", "cancelled", chat_id=chat_id, tool=name)
             raise
-        except Exception:
-            self.store.audit("tool.finish", "failed", chat_id=chat_id, tool=name)
+        except Exception as exc:
+            self.store.audit(
+                "tool.finish",
+                "failed",
+                chat_id=chat_id,
+                tool=name,
+                error_type=type(exc).__name__,
+                detail=str(exc)[:500] if isinstance(exc, StateConflict) else "Tool failed",
+            )
             raise
 
-    def inspect(self, _):
+    def inspect(self, _, ctx=None):
         return {
             "os": platform.system(),
             "python": platform.python_version(),
-            "workspace": str(self.settings.local_workspace.resolve()),
+            "workspace": str(getattr(ctx, "workspace", self.settings.local_workspace).resolve()),
             "docker": bool(shutil.which("docker")),
             "n8n_configured": bool(self.settings.n8n_api_key.get_secret_value()),
             "connectors": self.connectors.list(),
@@ -356,14 +398,36 @@ class Tools:
         path = self.resolve(args.path, mode)
         if path.stat().st_size > 100000:
             raise StateConflict("File is too large for one tool response")
-        return {"path": str(path), "content": path.read_text()}
+        import hashlib
+
+        raw = path.read_bytes()
+        digest = hashlib.sha256(raw).hexdigest()
+        revision = "r" + uuid4().hex[:8]
+        self.store.put(
+            "code_revisions",
+            revision,
+            {
+                "id": revision,
+                "chat_id": getattr(mode, "chat_id", None),
+                "path": str(path),
+                "sha256": digest,
+            },
+        )
+        return {
+            "path": str(path),
+            "revision": revision,
+            "sha256": digest,
+            "content": raw.decode(),
+        }
 
     def write_file(self, args, mode):
         path = self.resolve(args.path, mode)
         path.parent.mkdir(parents=True, exist_ok=True)
         temporary = None
         try:
-            with tempfile.NamedTemporaryFile(mode="w", dir=path.parent, delete=False) as stream:
+            with tempfile.NamedTemporaryFile(
+                mode="w", encoding="utf-8", newline="", dir=path.parent, delete=False
+            ) as stream:
                 temporary = Path(stream.name)
                 stream.write(args.content)
             temporary.replace(path)
