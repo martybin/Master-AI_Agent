@@ -1,58 +1,58 @@
 export const statuses = {
-  draft: "پیش‌نویس",
-  deploying: "در حال ارسال",
-  deployed: "ارسال‌شده · غیرفعال",
-  activating: "در حال فعال‌سازی",
-  active: "فعال",
-  deactivating: "در حال غیرفعال‌سازی",
-  deployment_unknown: "نیاز به تطبیق وضعیت",
-  activation_unknown: "نیاز به تطبیق وضعیت",
+  draft: "Draft",
+  deploying: "Deploying",
+  deployed: "Deployed · inactive",
+  activating: "Activating",
+  active: "Active",
+  deactivating: "Deactivating",
+  deployment_unknown: "Reconciliation required",
+  activation_unknown: "Reconciliation required",
 };
 export const nodeKinds = {
-  manual: ["شروع دستی", "play"],
-  webhook: ["دریافت پیام", "webhook"],
-  schedule: ["زمان‌بندی", "clock"],
-  set: ["تنظیم داده", "sliders"],
-  http_request: ["درخواست HTTP", "globe"],
-  ollama_chat: ["هوش مصنوعی محلی", "spark"],
-  if_equals: ["بررسی شرط", "branch"],
-  respond: ["برگرداندن پاسخ", "check"],
+  manual: ["Manual trigger", "play"],
+  webhook: ["Webhook", "webhook"],
+  schedule: ["Schedule", "clock"],
+  set: ["Set fields", "sliders"],
+  http_request: ["HTTP request", "globe"],
+  ollama_chat: ["Local AI", "spark"],
+  if_equals: ["Condition", "branch"],
+  respond: ["Respond", "check"],
 };
 export const stageLabels = {
-  checking_tools: "در حال بررسی نتیجهٔ کارها…",
-  tool_running: "در حال اجرای ابزار محلی…",
-  thinking: "دارم به درخواستت فکر می‌کنم…",
-  planning: "در حال طراحی Workflow با مدل محلی…",
-  validating: "دارم گره‌ها و اتصال‌ها را بررسی می‌کنم…",
-  compiling: "در حال آماده‌کردن Workflow برای n8n…",
+  checking_tools: "Checking results…",
+  tool_running: "Running a local tool…",
+  thinking: "Thinking through your request…",
+  planning: "Planning the workflow with your local model…",
+  validating: "Validating nodes and connections…",
+  compiling: "Compiling the workflow for n8n…",
 };
 export const warningLabels = {
   telegram_bridge:
-    "پس از بازبینی و فعال‌سازی، این طرح را از پنل Local Agent به اتصال تلگرام وصل کن.",
+    "After review and activation, bind this workflow to a Telegram connection in Local Agent.",
   native_workflow:
-    "گره‌ها، کد و عبارت‌ها را در n8n بررسی و آزمایش کن؛ اعتبار ساختاری به‌تنهایی اجرای درست را تضمین نمی‌کند.",
+    "Review and test the nodes, code, and expressions in n8n. Structural validation does not guarantee correct execution.",
   webhook_public:
-    "این Webhook احراز هویت ندارد؛ پیکربندی فعلی برای استفادهٔ محلی است.",
-  ollama_result: "متن خروجی مدل در message.content قرار می‌گیرد.",
+    "This webhook has no authentication. The supplied configuration is intended for local use.",
+  ollama_result: "The model response is available at message.content.",
   external_http:
-    "این Workflow می‌تواند اطلاعات را به مقصدهای HTTP نمایش‌داده‌شده بفرستد.",
+    "This workflow can send data to the HTTP destinations shown here.",
 };
 export function errorMessage(error) {
   if (error.status === 401)
-    return "کلید فضای کاری درست نیست یا اتصال منقضی شده است.";
+    return "The workspace key is invalid or the session has expired.";
   if (error.status === 429)
-    return "مدل مشغول است. بعد از تمام‌شدن درخواست فعلی دوباره بفرست.";
+    return "The model is busy. Try again after the current request finishes.";
   if (error.status === 409)
-    return "وضعیت یا نسخه عوض شده است. اطلاعات را تازه کن و دوباره بررسی کن.";
+    return "The state or version has changed. Refresh and review it again.";
   if (error.status === 422)
-    return "درخواست معتبر نیست. ورودی، کار اصلی و خروجی را دقیق‌تر مشخص کن.";
+    return "The request is invalid. Check the required fields and describe the input, task, and expected output.";
   if (error.status === 413)
-    return "پیام بیش از اندازه طولانی است. لطفاً کوتاه‌ترش کن.";
+    return "The message is too long. Please shorten it.";
   if (error.detail?.code === "not_configured")
-    return "کلید API اتصال n8n هنوز در تنظیمات پروژه وارد نشده است.";
+    return "The n8n API key has not been configured.";
   if (error.status === 503)
-    return "سرویس در دسترس نیست. بخش اتصال‌ها را بررسی کن؛ ارسال دوباره خودکار انجام نمی‌شود.";
-  return "ارتباط کامل نشد. وضعیت گفتگو و اتصال به برنامه را بررسی کن.";
+    return "The service is unavailable. Check Connections; the operation will not be retried automatically.";
+  return "The connection was interrupted. Check the chat status and your connection to BisCode.";
 }
 export class EventParser {
   constructor(onEvent) {
@@ -79,12 +79,12 @@ export class EventParser {
 export function nodeDetail(node) {
   if (node.kind === "native") return node.node_type;
   if (node.kind === "webhook") return `${node.method} / ${node.path}`;
-  if (node.kind === "schedule") return `فاصلهٔ دقیقه‌ای: ${node.every_minutes}`;
-  if (node.kind === "ollama_chat") return `ورودی: ${node.input_path}`;
+  if (node.kind === "schedule") return `Every ${node.every_minutes} minutes`;
+  if (node.kind === "ollama_chat") return `Input: ${node.input_path}`;
   if (node.kind === "if_equals") return `${node.input_path} = ${node.equals}`;
   if (node.kind === "http_request") return `${node.method} ${node.url}`;
   if (node.kind === "set")
-    return node.assignments.map((item) => item.name).join("، ");
+    return node.assignments.map((item) => item.name).join(", ");
   if (node.kind === "respond") return `JSON · ${node.status_code}`;
-  return "اجرا از ویرایشگر n8n";
+  return "Run from the n8n editor";
 }

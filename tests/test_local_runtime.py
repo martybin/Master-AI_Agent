@@ -452,7 +452,7 @@ def test_uncertain_http_mutation_stops_chat_without_model_retry(api, network, fa
         json={"content": "رکورد را در API ثبت کن", "request_id": str(uuid4())},
     )
     assert len(calls) == 1 and network.chat_calls == 1
-    assert "نامشخص" in response.text
+    assert "uncertain outcome" in response.text
 
 
 def test_tool_budget_is_bounded(api, network):
@@ -580,3 +580,17 @@ async def test_cancelling_chat_stops_inflight_local_command(settings, network, t
             pid = int(await asyncio.to_thread(pid_file.read_text))
             with pytest.raises(ProcessLookupError):
                 os.kill(pid, 0)
+
+
+def test_english_catalog_keeps_persian_lookup_and_owner_labels(api):
+    state = api.app.state
+    key = "n8n-nodes-base.scheduleTrigger"
+    original = state.local_store.get("catalog", key)
+    state.local_store.put("catalog", key, {**original, "label": "زمان‌بندی", "source": "builtin"})
+    state.catalog.initialize()
+    assert state.local_store.get("catalog", key)["label"] == "Schedule"
+    assert any(row["type"] == key for row in state.catalog.search("زمان بندی"))
+    assert any(row["type"] == key for row in state.catalog.search("schedule"))
+    state.local_store.put("catalog", key, {**original, "label": "گره سفارشی من", "source": "owner"})
+    state.catalog.initialize()
+    assert state.local_store.get("catalog", key)["label"] == "گره سفارشی من"

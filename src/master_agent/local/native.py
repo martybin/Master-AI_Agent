@@ -48,13 +48,26 @@ class NativeSpec(ClosedModel):
     connections: dict[str, dict[str, list[list[NativeLink]]]] = Field(default_factory=dict)
 
 
+LEGACY_LABELS = {
+    "شروع دستی": "Manual trigger",
+    "زمان\u200cبندی": "Schedule",
+    "درخواست HTTP": "HTTP request",
+    "تنظیم فیلد": "Set fields",
+    "شرط": "Condition",
+    "پاسخ Webhook": "Webhook response",
+    "کد JavaScript/Python": "JavaScript/Python code",
+    "ادغام مسیرها": "Merge branches",
+    "پردازش دسته\u200cای": "Loop over items",
+}
+
+
 class NativeCatalog:
     def __init__(self, store: LocalStore):
         self.store = store
 
     def initialize(self):
         types = [
-            ("manualTrigger", "شروع دستی", [1], True, 1, {}),
+            ("manualTrigger", "Manual trigger", [1], True, 1, {}),
             (
                 "webhook",
                 "Webhook",
@@ -67,10 +80,10 @@ class NativeCatalog:
                     "responseMode": {"enum": ["onReceived", "lastNode", "responseNode"]},
                 },
             ),
-            ("scheduleTrigger", "زمان‌بندی", [1.2], True, 1, {"rule": {"type": "object"}}),
+            ("scheduleTrigger", "Schedule", [1.2], True, 1, {"rule": {"type": "object"}}),
             (
                 "httpRequest",
-                "درخواست HTTP",
+                "HTTP request",
                 [4.2],
                 False,
                 1,
@@ -81,19 +94,19 @@ class NativeCatalog:
                     },
                 },
             ),
-            ("set", "تنظیم فیلد", [3.4], False, 1, {}),
-            ("if", "شرط", [2.2], False, 2, {}),
-            ("respondToWebhook", "پاسخ Webhook", [1.4], False, 0, {}),
+            ("set", "Set fields", [3.4], False, 1, {}),
+            ("if", "Condition", [2.2], False, 2, {}),
+            ("respondToWebhook", "Webhook response", [1.4], False, 0, {}),
             (
                 "code",
-                "کد JavaScript/Python",
+                "JavaScript/Python code",
                 [2],
                 False,
                 1,
                 {"language": {"enum": ["javaScript", "python"]}, "jsCode": {"type": "string"}},
             ),
-            ("merge", "ادغام مسیرها", [3.2], False, 1, {}),
-            ("splitInBatches", "پردازش دسته‌ای", [3], False, 2, {}),
+            ("merge", "Merge branches", [3.2], False, 1, {}),
+            ("splitInBatches", "Loop over items", [3], False, 2, {}),
             (
                 "telegram",
                 "Telegram Bot",
@@ -118,7 +131,10 @@ class NativeCatalog:
         ]
         for name, label, versions, trigger, outputs, properties in types:
             key = "n8n-nodes-base." + name
-            if any(row["type"] == key for row in self.store.list("catalog")):
+            existing = next((row for row in self.store.list("catalog") if row["type"] == key), None)
+            if existing:
+                if existing.get("source") == "builtin" and existing["label"] in LEGACY_LABELS:
+                    self.store.put("catalog", key, {**existing, "label": label})
                 continue
             required = {"webhook": ["path"], "httpRequest": ["url"]}.get(name, [])
             self.install(
@@ -161,12 +177,16 @@ class NativeCatalog:
         return record
 
     def search(self, query=""):
-        words = query.lower().split()
+        words = query.lower().replace("\u200c", " ").split()
+
+        def searchable(row):
+            aliases = [old for old, label in LEGACY_LABELS.items() if label == row["label"]]
+            return json.dumps([row, aliases], ensure_ascii=False).lower().replace("\u200c", " ")
+
         return [
             {k: row[k] for k in ("type", "label", "versions", "trigger", "description")}
             for row in self.store.list("catalog")
-            if not words
-            or any(word in json.dumps(row, ensure_ascii=False).lower() for word in words)
+            if not words or any(word in searchable(row) for word in words)
         ][:40]
 
     def import_n8n(self, descriptions: list[dict]):

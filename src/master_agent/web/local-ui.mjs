@@ -1,5 +1,5 @@
 // Owner-only connection and local capability controls. Secrets never enter chat history.
-import { statuses } from "./ui-utils.mjs";
+import { statuses } from "./ui-utils.mjs?v=0.4.1";
 
 export function mountLocalAgent({
   api,
@@ -17,35 +17,35 @@ export function mountLocalAgent({
   let current = null,
     loginAlias = null;
   const modes = {
-    off: "خاموش",
-    workspace: "پوشهٔ پروژه",
-    system: "سیستم و ترمینال",
+    off: "Off",
+    workspace: "Project folder",
+    system: "System & terminal",
   };
   const kinds = {
-    telegram_bot: "بات تلگرام",
-    telegram_user: "اکانت شخصی",
+    telegram_bot: "Telegram bot",
+    telegram_user: "Personal account",
     http: "HTTP API",
   };
   const localStates = {
-    configured: "ثبت شده",
-    connected: "متصل",
-    stopped: "متوقف",
-    running: "در حال دریافت",
-    waiting: "منتظر اتصال",
-    needs_attention: "نیاز به بررسی",
-    pending: "منتظر پردازش",
-    delivering: "در حال تحویل",
-    uncertain: "نتیجه نامشخص؛ بررسی لازم است",
-    complete: "تکمیل شد",
-    failed: "ناموفق",
-    cancelled: "متوقف شد",
+    configured: "Configured",
+    connected: "Connected",
+    stopped: "Stopped",
+    running: "Listening",
+    waiting: "Waiting for connection",
+    needs_attention: "Needs attention",
+    pending: "Pending",
+    delivering: "Delivering",
+    uncertain: "Uncertain delivery — review required",
+    complete: "Complete",
+    failed: "Failed",
+    cancelled: "Cancelled",
   };
   const statusLabel = (value) => localStates[value] || value;
   function error(err) {
     $("local-panel-error").textContent =
       err.status === 409 && typeof err.detail === "string"
         ? err.detail
-        : "عملیات کامل نشد؛ اتصال، ورود یا تنظیمات را بررسی کن.";
+        : "Could not complete the operation. Check the connection, sign-in, and settings.";
     $("local-panel-error").hidden = false;
     showError(err);
   }
@@ -70,19 +70,19 @@ export function mountLocalAgent({
       "/local/status" +
         (state.chat ? "?chat_id=" + encodeURIComponent(state.chat.id) : ""),
     );
-    $("local-workspace").textContent = "پوشهٔ پروژه: " + current.workspace;
+    $("local-workspace").textContent = "Workspace: " + current.workspace;
     $("local-current-grant").textContent =
-      "دسترسی این گفتگو: " +
+      "Chat access: " +
       modes[current.access.mode] +
       (current.access.expires_at
-        ? " · پایان: " +
-          new Date(current.access.expires_at).toLocaleTimeString("fa-IR")
+        ? " · Expires: " +
+          new Date(current.access.expires_at).toLocaleTimeString("en-US")
         : "");
     $("local-access-mode").value = current.access.mode;
     $("local-workspace-input").value =
       current.access.workspace || current.workspace;
     $("local-catalog-count").textContent =
-      `${current.catalog_count} نوع گره در کاتالوگ ثبت شده است.`;
+      `${current.catalog_count} node types available in the catalog.`;
     $("local-tool-list").replaceChildren(
       ...current.tools.map((tool) => {
         const item = el("div", "local-tool");
@@ -92,10 +92,10 @@ export function mountLocalAgent({
             "span",
             "",
             tool.scope === "system"
-              ? "نیاز به دسترسی سیستم"
+              ? "System access required"
               : tool.scope === "workspace"
-                ? "نیاز به مجوز پروژه"
-                : "آماده",
+                ? "Workspace access required"
+                : "Ready",
           ),
         );
         return item;
@@ -104,7 +104,7 @@ export function mountLocalAgent({
     const list = $("local-connection-list");
     list.replaceChildren();
     if (!current.connections.length)
-      list.append(el("p", "service-detail", "هنوز اتصالی ثبت نشده است."));
+      list.append(el("p", "service-detail", "No connections yet."));
     for (const connection of current.connections) {
       const card = el("article", "local-connection-card");
       const info = el("div");
@@ -120,14 +120,14 @@ export function mountLocalAgent({
       const actions = el("div", "local-row-actions");
       actions.append(
         button(
-          "بررسی اتصال",
+          "Test connection",
           () =>
             run(async () => {
               await api(`/local/connections/${connection.id}/verify`, {
                 method: "POST",
               });
               await refresh();
-              toast("اتصال بررسی شد.");
+              toast("Connection checked.");
             }),
           "secondary-button",
         ),
@@ -135,12 +135,12 @@ export function mountLocalAgent({
       if (connection.kind === "telegram_user")
         actions.append(
           button(
-            "ورود به حساب",
+            "Sign in",
             () => {
               loginAlias = connection.id;
               $("telegram-password-fields").hidden = true;
               $("telegram-login-title").textContent =
-                "ورود به " + connection.label;
+                "Sign in to " + connection.label;
               $("telegram-login-panel").hidden = false;
               $("telegram-phone-form").hidden = false;
               $("telegram-code-form").hidden = true;
@@ -154,13 +154,13 @@ export function mountLocalAgent({
     const selectedConnection = $("binding-connection").value,
       selectedBuild = $("binding-build").value;
     $("binding-connection").replaceChildren(
-      option("", "اتصال را انتخاب کن"),
+      option("", "Select a connection"),
       ...current.connections
         .filter((c) => c.kind !== "http")
         .map((c) => option(c.id, c.label + " · " + kinds[c.kind])),
     );
     $("binding-build").replaceChildren(
-      option("", "Workflow را انتخاب کن"),
+      option("", "Select a workflow"),
       ...state.builds.map((b) =>
         option(
           b.id,
@@ -176,11 +176,11 @@ export function mountLocalAgent({
       const card = el("article", "local-connection-card");
       card.append(
         el("strong", "", binding.id),
-        el("p", "service-detail", `وضعیت: ${statusLabel(binding.status)}`),
+        el("p", "service-detail", `Status: ${statusLabel(binding.status)}`),
       );
       card.append(
         button(
-          binding.enabled ? "توقف دریافت پیام" : "شروع دریافت پیام",
+          binding.enabled ? "Stop listening" : "Start listening",
           () =>
             run(async () => {
               if (binding.enabled)
@@ -189,7 +189,9 @@ export function mountLocalAgent({
                 });
               else {
                 if (!$("binding-start-confirm").checked) {
-                  toast("ابتدا اجازهٔ پردازش خودکار را انتخاب کن.");
+                  toast(
+                    "Confirm automatic processing before starting the listener.",
+                  );
                   return;
                 }
                 await api(`/local/bindings/${binding.id}/start`, {
@@ -205,7 +207,7 @@ export function mountLocalAgent({
       bindings.append(card);
     }
     const inbox = $("local-inbox");
-    inbox.replaceChildren(el("h3", "", "تحویل پیام‌ها"));
+    inbox.replaceChildren(el("h3", "", "Message deliveries"));
     if (
       current.inbox.some((item) =>
         ["pending", "uncertain"].includes(item.status),
@@ -220,7 +222,7 @@ export function mountLocalAgent({
         el(
           "span",
           "",
-          "می‌دانم عملیات قبلی ممکن است انجام شده باشد؛ تکرار پیام یا عملیات در تلاش مجدد را تأیید می‌کنم.",
+          "I understand the previous operation may have succeeded and approve the risk of a duplicate message or action on retry.",
         ),
       );
       inbox.append(label);
@@ -237,13 +239,15 @@ export function mountLocalAgent({
       if (["pending", "uncertain"].includes(item.status))
         row.append(
           button(
-            "تلاش مجدد با تأیید",
+            "Confirm and retry",
             () =>
               run(async () => {
                 if (
                   !document.getElementById("delivery-retry-confirm")?.checked
                 ) {
-                  toast("ابتدا تأیید احتمال تکرار عملیات را انتخاب کن.");
+                  toast(
+                    "Acknowledge the risk of duplicate actions before retrying.",
+                  );
                   return;
                 }
                 await api(`/local/inbox/${item.id}/retry`, {
@@ -258,14 +262,14 @@ export function mountLocalAgent({
       inbox.append(row);
     }
     $("local-audit").replaceChildren(
-      el("h3", "", "فعالیت اخیر"),
+      el("h3", "", "Recent activity"),
       ...current.audit
         .slice(0, 20)
         .map((item) =>
           el(
             "p",
             "service-detail",
-            `${new Date(item.at).toLocaleTimeString("fa-IR")} · ${item.tool || item.action} · ${item.status}`,
+            `${new Date(item.at).toLocaleTimeString("en-US")} · ${item.tool || item.action} · ${item.status}`,
           ),
         ),
     );
@@ -304,7 +308,7 @@ export function mountLocalAgent({
       });
       $("local-system-confirm").checked = false;
       await refresh();
-      toast("دسترسی همین گفتگو تنظیم شد.");
+      toast("Access updated for this chat.");
     });
   });
   function fields() {
@@ -338,7 +342,7 @@ export function mountLocalAgent({
       $("local-connection-form").reset();
       fields();
       await refresh();
-      toast("اتصال به‌صورت رمز‌شده ثبت شد.");
+      toast("Connection saved with encrypted credentials.");
     }).finally(() => (submit.disabled = false));
   });
   $("telegram-phone-form").addEventListener("submit", (event) => {
@@ -383,7 +387,7 @@ export function mountLocalAgent({
         $("telegram-login-panel").hidden = true;
         loginAlias = null;
         await refresh();
-        toast("ورود به حساب شخصی کامل شد.");
+        toast("Personal account signed in.");
       }
     }).finally(() => (submit.disabled = false));
   });
@@ -419,7 +423,7 @@ export function mountLocalAgent({
         }),
       });
       await refresh();
-      toast("اتصال ثبت شد؛ دریافت پیام هنوز شروع نشده است.");
+      toast("Binding saved. The listener has not been started.");
     });
   });
   $("load-telegram-dialogs").addEventListener("click", () =>
@@ -453,7 +457,7 @@ export function mountLocalAgent({
     event.preventDefault();
     run(async () => {
       if (!state.chat) {
-        toast("ابتدا یک گفتگو بساز و دسترسی پوشهٔ پروژه را فعال کن.");
+        toast("Create a chat and grant workspace access first.");
         return;
       }
       const result = await api("/local/tools/execute", {
@@ -465,7 +469,7 @@ export function mountLocalAgent({
         }),
       });
       await refresh();
-      toast(`${result.result.imported} گره وارد شد.`);
+      toast(`Imported ${result.result.imported} node types.`);
     });
   });
   $("local-agent-dialog").addEventListener("close", () => {

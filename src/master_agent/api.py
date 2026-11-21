@@ -34,6 +34,13 @@ from master_agent.service import BuildService
 from master_agent.validator import InvalidIR, Policy, require_valid, validate_ir
 
 
+class RevalidatedStaticFiles(StaticFiles):
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 class BodyLimit:
     """Bound all request bodies, including chunked requests, before JSON parsing."""
 
@@ -176,7 +183,7 @@ def create_app(
     app.include_router(local_router(authenticate))
 
     web = Path(__file__).parent / "web"
-    app.mount("/assets", StaticFiles(directory=web), name="assets")
+    app.mount("/assets", RevalidatedStaticFiles(directory=web), name="assets")
 
     @app.get("/", include_in_schema=False)
     async def home():

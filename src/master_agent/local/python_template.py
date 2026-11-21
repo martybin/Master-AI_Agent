@@ -149,24 +149,27 @@ def files(name, instruction, model, base_url):
         "tests/test_agent.py": TEST_SOURCE,
         "README.md": f"""# {name}
 
-ایجنت محلی Python با Ollama؛ پایهٔ گفتگو بدون حافظه است. قابلیت‌های اختصاصی را
-در `agent.py` پیاده‌سازی و آزمایش کنید. متن دستورالعمل در `agent.json` است.
+A standalone Python agent powered by Ollama. The starting template is stateless;
+implement and test additional capabilities in `agent.py`. Model instructions
+are stored in `agent.json` and can specify Persian or any supported language.
 
-Python 3.11+ کافی است و وابستگی خارجی ندارد. Ollama باید جدا روشن باشد.
+Requires Python 3.11+ and a separately running Ollama instance. No third-party
+Python dependencies are needed for this template.
 
 ```bash
-python agent.py 'سلام'
+python agent.py 'Hello'
 python agent.py --serve --port 8081
 python -m unittest discover -s tests -v
 ```
 
-API محلی: POST `/chat` با JSON `{{"message":"سلام"}}`؛ وضعیت: GET `/healthz`.
-آدرس پیش‌فرض فقط 127.0.0.1 است. `AGENT_API_KEY` اختیاری، احراز هویت Bearer را
-برای مسیر گفتگو فعال می‌کند. کلید را در فایل کد یا git نگذارید.
-`OLLAMA_MODEL` و `OLLAMA_BASE_URL` تنظیمات پیش‌فرض agent.json را عوض می‌کنند.
+The local API provides POST `/chat` with JSON `{{"message":"Hello"}}` and
+GET `/healthz`. It binds to `127.0.0.1` by default. Set `AGENT_API_KEY` to require
+Bearer authentication for chat requests. Keep credentials out of source files
+and Git. `OLLAMA_MODEL` and `OLLAMA_BASE_URL` override the defaults in `agent.json`.
 
-تست‌ها ارتباط مدل را شبیه‌سازی می‌کنند؛ موفقیت آن‌ها صحت زندهٔ Ollama یا
-یکپارچه‌سازی‌های سفارشی را اثبات نمی‌کند. اجرای سرویس جدا از ساخت پروژه است.
+The tests mock model requests; passing them does not verify a live Ollama
+connection or custom integrations. Starting the service is a separate action
+from creating this project.
 """,
         ".gitignore": "__pycache__/\n.venv/\n.env\n*.key\n*.session\n",
     }

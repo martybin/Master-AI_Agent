@@ -49,14 +49,14 @@ test("connection errors never expose raw upstream bodies", () => {
     detail: { message: "PRIVATE_API_KEY" },
   });
   assert(!text.includes("PRIVATE_API_KEY"));
-  assert.match(errorMessage({ status: 401 }), /کلید/);
+  assert.match(errorMessage({ status: 401 }), /workspace key/);
 });
 
 test("workflow labels preserve uncertain and inactive states", () => {
-  assert.match(statuses.deployed, /غیرفعال/);
-  assert.match(statuses.deployment_unknown, /تطبیق/);
+  assert.match(statuses.deployed, /inactive/);
+  assert.match(statuses.deployment_unknown, /Reconciliation/);
   assert.equal(
     nodeDetail({ kind: "ollama_chat", input_path: "body.message" }),
-    "ورودی: body.message",
+    "Input: body.message",
   );
 });

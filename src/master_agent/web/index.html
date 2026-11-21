@@ -1,48 +1,52 @@
 <!doctype html>
-<html lang="fa" dir="rtl">
+<html lang="en" dir="ltr">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#191b1d" />
     <meta
       name="description"
-      content="با BisCode گفتگو کن، ایجنتت را طراحی کن و Workflow را در n8n بساز."
+      content="Build n8n automations and Python agents through conversation with your local AI."
     />
-    <title>BisCode — ساخت ایجنت با n8n و Python</title>
+    <title>BisCode — Local AI Agent Builder</title>
     <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/assets/app.css" />
-    <script type="module" src="/assets/app.js"></script>
+    <link rel="stylesheet" href="/assets/app.css?v=0.4.1" />
+    <script type="module" src="/assets/app.js?v=0.4.1"></script>
   </head>
   <body>
-    <a class="skip-link" href="#prompt">رفتن به نوشتن پیام</a>
+    <a class="skip-link" href="#prompt">Skip to message input</a>
     <div class="app-shell" id="app-shell">
-      <aside class="sidebar" id="sidebar" aria-label="فضای کاری">
-        <a class="brand" href="/" aria-label="صفحهٔ آغاز BisCode"
+      <aside class="sidebar" id="sidebar" aria-label="Workspace">
+        <a class="brand" href="/" aria-label="BisCode home"
           ><span class="brand-symbol" data-icon="master"></span
           ><span>BisCode<span class="brand-dot">.</span></span
           ><span class="brand-tag">LOCAL</span></a
         >
         <button class="new-chat" id="new-chat">
-          <span data-icon="plus"></span><span>گفتگوی تازه</span><kbd>⌘ K</kbd>
+          <span data-icon="plus"></span><span>New chat</span><kbd>Ctrl K</kbd>
         </button>
-        <div class="sidebar-section-label">فضای کاری</div>
-        <button class="nav-item" id="local-agent-button">
-          <span data-icon="model"></span><span>Local Agent و اتصال‌ها</span>
+        <div class="sidebar-section-label">Workspace</div>
+        <button
+          class="nav-item"
+          id="local-agent-button"
+          title="Tools, connections, and automation"
+        >
+          <span data-icon="model"></span><span>Local Agent</span>
         </button>
         <button class="nav-item" id="all-workflows">
-          <span data-icon="workflow"></span><span>Workflowهای من</span
+          <span data-icon="workflow"></span><span>My workflows</span
           ><span class="nav-count" id="workflow-count">—</span>
         </button>
         <button class="nav-item" id="coding-projects-button">
-          <span data-icon="cube"></span><span>پروژه‌ها و کدنویسی</span>
+          <span data-icon="cube"></span><span>Projects & code</span>
         </button>
         <div class="history-heading">
-          <span>گفتگوها</span
+          <span>Chats</span
           ><button
             class="icon-button tiny"
             id="toggle-search"
-            aria-label="جستجوی گفتگوها"
-            title="جستجوی گفتگوها"
+            aria-label="Search chats"
+            title="Search chats"
           >
             <span data-icon="search"></span>
           </button>
@@ -50,29 +54,31 @@
         <input
           class="history-search"
           id="history-search"
-          placeholder="جستجو در گفتگوها…"
-          aria-label="جستجو در گفتگوها"
+          placeholder="Search chats…"
+          aria-label="Search chats"
           hidden
         />
-        <nav class="chat-history" id="chat-history" aria-label="گفتگوهای اخیر">
-          <p class="history-empty">ایده‌های بعدی‌ات از اینجا شروع می‌شوند.</p>
+        <nav class="chat-history" id="chat-history" aria-label="Chat history">
+          <p class="history-empty">
+            Your next project starts with a conversation.
+          </p>
         </nav>
         <div class="sidebar-bottom">
           <div class="local-note">
             <span data-icon="shield"></span>
             <div>
-              <strong>تو تصمیم می‌گیری.</strong
-              ><span>ساخت و انتشار، با کنترل تو.</span>
+              <strong>You stay in control.</strong
+              ><span>Activation needs your approval.</span>
             </div>
           </div>
           <button class="nav-item" id="help-button">
-            <span data-icon="book"></span><span>راهنمای شروع</span>
+            <span data-icon="book"></span><span>Getting started</span>
           </button>
           <button class="profile-button" id="settings-button">
             <span class="avatar">M</span
             ><span class="profile-text"
-              ><strong>فضای شخصی</strong
-              ><span id="profile-state">اتصال به مدل محلی</span></span
+              ><strong>Personal workspace</strong
+              ><span id="profile-state">Local model connection</span></span
             ><span data-icon="settings"></span>
           </button>
         </div>
@@ -80,7 +86,7 @@
       <button
         class="sidebar-scrim"
         id="sidebar-scrim"
-        aria-label="بستن فهرست گفتگوها"
+        aria-label="Close chat history"
         hidden
       ></button>
       <main class="workspace">
@@ -89,23 +95,23 @@
             <button
               class="icon-button mobile-menu"
               id="menu-button"
-              aria-label="نمایش فهرست گفتگوها"
+              aria-label="Open chat history"
             >
               <span data-icon="menu"></span></button
             ><span class="workspace-name">BisCode</span
             ><span class="slash">/</span
-            ><span id="chat-title">گفتگوی تازه</span>
+            ><span id="chat-title" dir="auto">New chat</span>
           </div>
           <div class="topbar-actions">
             <button class="connection-button" id="connection-button">
               <span class="status-dot" id="connection-dot"></span
-              ><span id="connection-label">اتصال به فضای کاری</span></button
+              ><span id="connection-label">Connect workspace</span></button
             ><span class="toolbar-divider"></span
             ><button
               class="icon-button"
               id="toggle-inspector"
-              aria-label="نمایش پنل Workflow"
-              title="پنل Workflow"
+              aria-label="Open workflow inspector"
+              title="Workflow inspector"
             >
               <span data-icon="panel"></span>
             </button>
@@ -115,52 +121,52 @@
           <section class="welcome" id="welcome" aria-labelledby="welcome-title">
             <div class="welcome-mark" data-icon="master"></div>
             <div class="eyebrow">
-              <span class="eyebrow-line"></span>از یک ایده شروع کن
+              <span class="eyebrow-line"></span>START WITH AN IDEA
             </div>
             <h1 id="welcome-title">
-              ایده‌ات را بگو.<br /><span>ایجنتت را بساز.</span>
+              Describe your idea<br /><span>Build your agent</span>
             </h1>
             <p class="welcome-description">
-              با هم طراحی‌اش می‌کنیم؛<br class="small-break" />
-              بعد، روی n8n به جریانش می‌اندازیم.
+              Design in chat. Build locally with n8n or Python.
             </p>
-            <div class="suggestions" aria-label="ایده‌هایی برای شروع">
+            <div class="suggestions" aria-label="Ideas to get started">
               <button
                 class="suggestion"
-                data-prompt="یک دستیار فارسی بساز که پیام را با Webhook از body.message بگیرد، با Ollama پاسخ بدهد و نتیجه را به صورت JSON برگرداند."
+                data-prompt="Build a Persian-speaking assistant that receives body.message through a POST webhook, replies with Ollama, and returns JSON."
               >
                 <span class="suggestion-icon mint" data-icon="chat"></span
-                ><strong>یک دستیار گفتگو بساز</strong
-                ><span>پیام بگیرد و هوشمندانه جواب بدهد</span>
+                ><strong>Build a chat assistant</strong
+                ><span>Receive a message. Generate a reply.</span>
               </button>
               <button
                 class="suggestion"
-                data-prompt="یک خلاصه‌ساز فارسی بساز: متن را با Webhook POST از body.text بگیرد، با Ollama در سه جمله خلاصه کند و پاسخ JSON برگرداند."
+                data-prompt="Build a Persian summarizer that receives body.text through a POST webhook, summarizes it in three sentences with Ollama, and returns JSON."
               >
                 <span class="suggestion-icon lilac" data-icon="text"></span
-                ><strong>متن‌ها را خلاصه کن</strong
-                ><span>متن بلند وارد شود، خلاصه بیرون بیاید</span>
+                ><strong>Summarize text</strong
+                ><span>Turn long text into concise summaries.</span>
               </button>
               <button
                 class="suggestion"
-                data-prompt="یک Workflow بساز که از Webhook POST مقدار body.kind را بگیرد؛ اگر برابر support بود پاسخ JSON با فیلد route و مقدار support بدهد و در غیر این صورت مقدار general برگرداند."
+                data-prompt="Build a workflow that receives body.kind through a POST webhook. If it equals support, return JSON with route set to support; otherwise return general."
               >
                 <span class="suggestion-icon blue" data-icon="branch"></span
-                ><strong>پیام‌ها را دسته‌بندی کن</strong
-                ><span>برای هر ورودی، یک مسیر مشخص</span>
+                ><strong>Route incoming messages</strong
+                ><span>Choose a path for each request.</span>
               </button>
               <button
                 class="suggestion"
-                data-prompt="برای اولین تجربه یک ایجنت ساده با اجرای دستی بساز. یک متن سلام در گره تنظیم فیلد قرار بده و آن را به Ollama بفرست تا به فارسی خودش را معرفی کند."
+                data-prompt="Build a simple manually triggered agent. Set a greeting in a field and send it to Ollama for a short introduction in Persian."
               >
                 <span class="suggestion-icon sand" data-icon="spark"></span
-                ><strong>از یک مثال ساده شروع کن</strong
-                ><span>یک ایجنت کوچک برای اولین تجربه</span>
+                ><strong>Start with an example</strong
+                ><span>Explore a small, working agent.</span>
               </button>
             </div>
             <div class="welcome-footnote">
-              <span data-icon="cube"></span>طراحی با گفتگو <span>·</span> اجرای
-              محلی <span>·</span> انتشار با تأیید تو
+              <span data-icon="cube"></span>Designed through conversation
+              <span>·</span> Runs locally <span>·</span> Activated with your
+              approval
             </div>
           </section>
           <div
@@ -173,34 +179,33 @@
         <div class="composer-area">
           <div class="build-progress" id="build-progress" role="status" hidden>
             <span class="spinner"></span
-            ><span id="progress-label">دارم به درخواستت فکر می‌کنم…</span
-            ><span class="elapsed" id="elapsed">۰:۰۰</span>
+            ><span id="progress-label">Thinking through your request…</span
+            ><span class="elapsed" id="elapsed">0:00</span>
           </div>
           <form class="composer" id="composer">
-            <label class="sr-only" for="prompt"
-              >درخواستت را برای BisCode بنویس</label
-            >
+            <label class="sr-only" for="prompt">Message BisCode</label>
             <textarea
               id="prompt"
+              dir="auto"
               rows="2"
               maxlength="6000"
-              placeholder="دوست داری ایجنتت چه کاری انجام بدهد؟"
+              placeholder="Describe your agent in English or Persian…"
               spellcheck="false"
             ></textarea>
             <div class="composer-toolbar">
               <div class="composer-meta">
-                <label class="sr-only" for="build-target">روش ساخت</label>
-                <select id="build-target" aria-label="روش ساخت">
-                  <option value="auto">خودکار · پیش‌فرض n8n</option>
-                  <option value="n8n">ساخت با n8n</option>
-                  <option value="python">ساخت ایجنت Python</option>
-                  <option value="code">کدنویسی روی پروژه</option>
+                <label class="sr-only" for="build-target">Build method</label>
+                <select id="build-target" aria-label="Build method">
+                  <option value="auto">Auto · n8n by default</option>
+                  <option value="n8n">n8n workflow</option>
+                  <option value="python">Python agent</option>
+                  <option value="code">Local coding</option>
                 </select>
                 <span class="model-label"
                   ><span data-icon="model"></span
                   ><bdi id="model-label">Ollama · Local</bdi></span
                 ><span class="composer-separator"></span
-                ><span class="composer-hint">Enter برای ارسال</span>
+                ><span class="composer-hint">Enter to send</span>
               </div>
               <button
                 type="button"
@@ -208,27 +213,27 @@
                 id="cancel-run"
                 hidden
               >
-                توقف
+                Stop
               </button>
               <button
                 type="submit"
                 class="send-button"
                 id="send-button"
-                aria-label="ارسال پیام"
+                aria-label="Send message"
               >
-                <span data-icon="spark"></span><span>بفرست</span>
+                <span data-icon="spark"></span><span>Send</span>
               </button>
             </div>
           </form>
           <p class="composer-caption">
-            BisCode طرح را می‌سازد؛ فعال‌سازی Workflow همیشه با تأیید توست.
+            BisCode builds the plan. You approve workflow activation.
           </p>
         </div>
       </main>
       <aside
         class="inspector"
         id="inspector"
-        aria-label="پیش‌نمایش Workflow"
+        aria-label="Workflow preview"
         hidden
       >
         <header class="inspector-header">
@@ -236,7 +241,7 @@
           ><button
             class="icon-button"
             id="close-inspector"
-            aria-label="بستن پنل Workflow"
+            aria-label="Close workflow inspector"
           >
             <span data-icon="close"></span>
           </button>
@@ -244,8 +249,8 @@
         <div id="inspector-content" class="inspector-content">
           <div class="inspector-empty">
             <span data-icon="workflow"></span>
-            <h2>اینجا، ایده شکل می‌گیرد.</h2>
-            <p>بعد از ساخت، گره‌ها و اتصال‌های Workflow را اینجا می‌بینی.</p>
+            <h2>Your workflow takes shape here.</h2>
+            <p>Build a workflow to inspect its nodes and connections here.</p>
           </div>
         </div>
       </aside>
@@ -257,19 +262,19 @@
       aria-labelledby="delete-chat-heading"
     >
       <header class="dialog-header">
-        <h2 id="delete-chat-heading">حذف گفتگو</h2>
+        <h2 id="delete-chat-heading">Delete chat</h2>
         <button
           class="icon-button"
           data-close="delete-chat-dialog"
-          aria-label="بستن"
+          aria-label="Close"
         >
           <span data-icon="close"></span>
         </button>
       </header>
-      <p id="delete-chat-title" class="delete-chat-title"></p>
+      <p id="delete-chat-title" dir="auto" class="delete-chat-title"></p>
       <p class="dialog-intro">
-        این گفتگو و پیام‌هایش برای همیشه حذف می‌شوند و دسترسی محلی آن لغو
-        می‌شود. پروژه‌ها، فایل‌ها و Workflowهای ساخته‌شده باقی می‌مانند.
+        This permanently deletes the chat and its messages and revokes its local
+        access. Existing projects, files, and workflows are kept.
       </p>
       <form id="delete-chat-form">
         <p id="delete-chat-error" class="form-error" role="alert" hidden></p>
@@ -279,14 +284,14 @@
             type="button"
             data-close="delete-chat-dialog"
           >
-            انصراف
+            Cancel
           </button>
           <button
             class="primary-button danger-button"
             id="confirm-delete-chat"
             type="submit"
           >
-            <span data-icon="trash"></span>حذف گفتگو
+            <span data-icon="trash"></span>Delete chat
           </button>
         </footer>
       </form>
@@ -299,32 +304,32 @@
       <header class="dialog-header">
         <div>
           <span class="eyebrow">YOUR WORKSPACE</span>
-          <h2 id="settings-title">اتصال به فضای کاری</h2>
+          <h2 id="settings-title">Connect workspace</h2>
         </div>
         <button
           class="icon-button"
           data-close="settings-dialog"
-          aria-label="بستن تنظیمات"
+          aria-label="Close settings"
         >
           <span data-icon="close"></span>
         </button>
       </header>
       <p class="dialog-intro">
-        برای شروع، کلید فضای کاری‌ات را وارد کن. اتصال به Ollama و n8n از
-        تنظیمات همین پروژه خوانده می‌شود.
+        Enter your workspace key to get started. Ollama and n8n connections use
+        this project's settings.
       </p>
       <form id="connection-form">
-        <label for="api-key">کلید فضای کاری <bdi>MASTER_API_KEY</bdi></label
+        <label for="api-key">Workspace key <bdi>MASTER_API_KEY</bdi></label
         ><input
           id="api-key"
           type="password"
           autocomplete="off"
-          placeholder="کلید را از فایل .env پروژه کپی کن"
+          placeholder="Paste MASTER_API_KEY from your project .env"
           dir="ltr"
           required
         /><label class="check-label"
           ><input id="remember-key" type="checkbox" /><span
-            >اتصال را تا بسته‌شدن این تب نگه دار</span
+            >Keep me connected until this tab closes</span
           ></label
         >
         <div id="connection-error" class="form-error" role="alert" hidden></div>
@@ -333,25 +338,25 @@
           id="connect-button"
           type="submit"
         >
-          اتصال به BisCode
+          Connect to BisCode
         </button>
       </form>
       <div class="service-list" id="service-list"></div>
       <div class="dialog-footer">
         <button class="text-button" id="refresh-system">
-          <span data-icon="refresh"></span>بررسی دوبارهٔ اتصال</button
+          <span data-icon="refresh"></span>Check connections</button
         ><button class="text-button" id="logout-button" hidden>
-          قطع اتصال
+          Disconnect
         </button>
       </div>
     </dialog>
     <dialog id="help-dialog" class="dialog" aria-labelledby="help-title">
       <header class="dialog-header">
-        <h2 id="help-title">از گفتگو تا Workflow</h2>
+        <h2 id="help-title">From conversation to workflow</h2>
         <button
           class="icon-button"
           data-close="help-dialog"
-          aria-label="بستن راهنما"
+          aria-label="Close guide"
         >
           <span data-icon="close"></span>
         </button>
@@ -359,36 +364,36 @@
       <div class="help-steps">
         <article>
           <span data-icon="chat"></span>
-          <h3>ایده‌ات را تعریف کن</h3>
+          <h3>Describe the task</h3>
           <p>
-            بگو ورودی چیست، ایجنت چه کاری انجام بدهد و چه خروجی‌ای می‌خواهی.
-            می‌توانی با پیام بعدی طرح را تغییر بدهی.
+            Describe the input, what the agent should do, and the output you
+            expect. Refine the plan with follow-up messages in English or
+            Persian.
           </p>
         </article>
         <article>
           <span data-icon="workflow"></span>
-          <h3>طرح را بررسی کن</h3>
+          <h3>Review the plan</h3>
           <p>
-            گره‌ها، اتصال‌ها و خروجی JSON در پنل Workflow آماده می‌شوند.
-            ایجنت‌های این نسخه می‌توانند با Ollama گفتگو کنند؛ حافظه و ابزارهای
-            خارجی هنوز اضافه نشده‌اند.
+            Inspect the nodes, connections, and compiled JSON in the workflow
+            panel. Review integration requirements and test the workflow before
+            activation.
           </p>
         </article>
         <article>
           <span data-icon="play"></span>
-          <h3>به n8n بفرست</h3>
+          <h3>Deploy to n8n</h3>
           <p>
-            پس از اتصال n8n، طرح به‌صورت غیرفعال ساخته می‌شود. بازبینی و تأیید
-            فعال‌سازی یک مرحلهٔ جداست.
+            Once n8n is connected, deploy an inactive workflow. Review and
+            explicit activation approval are separate steps.
           </p>
         </article>
       </div>
       <div class="help-note">
-        <strong>اتصال n8n</strong>
+        <strong>Connect n8n</strong>
         <p>
-          Docker را اجرا کن، در n8n کلید API بساز و آن را در
-          <bdi>N8N_API_KEY</bdi> فایل <bdi>.env</bdi> بگذار. سپس BisCode را
-          دوباره اجرا کن.
+          Start Docker, create an n8n API key, and set
+          <bdi>N8N_API_KEY</bdi> in <bdi>.env</bdi>. Then restart BisCode.
         </p>
         <code dir="ltr">docker compose up -d n8n</code>
       </div>
@@ -401,12 +406,12 @@
       <header class="dialog-header">
         <div>
           <span class="eyebrow">FINAL REVIEW</span>
-          <h2 id="review-title">بازبینی پیش از فعال‌سازی</h2>
+          <h2 id="review-title">Review before activation</h2>
         </div>
         <button
           class="icon-button"
           data-close="review-dialog"
-          aria-label="بستن بازبینی"
+          aria-label="Close review"
         >
           <span data-icon="close"></span>
         </button>
@@ -414,15 +419,15 @@
       <div id="review-content"></div>
       <label class="check-label approval-check"
         ><input id="approve-check" type="checkbox" /><span
-          >طرح و مقصد درخواست‌ها را بررسی کردم و فعال‌سازی همین نسخه را تأیید
-          می‌کنم.</span
+          >I have reviewed this workflow and its request destinations and
+          approve activation of this exact version.</span
         ></label
       >
       <div class="dialog-actions">
         <button class="secondary-button" data-close="review-dialog">
-          فعلاً نه</button
+          Not now</button
         ><button class="primary-button" id="approve-button" disabled>
-          تأیید و فعال‌سازی
+          Approve & activate
         </button>
       </div>
     </dialog>
@@ -434,12 +439,12 @@
       <header class="dialog-header">
         <div>
           <span class="eyebrow">YOUR BUILDS</span>
-          <h2 id="workflows-title">Workflowهای من</h2>
+          <h2 id="workflows-title">My workflows</h2>
         </div>
         <button
           class="icon-button"
           data-close="workflows-dialog"
-          aria-label="بستن فهرست Workflowها"
+          aria-label="Close workflow list"
         >
           <span data-icon="close"></span>
         </button>
@@ -452,28 +457,28 @@
       aria-labelledby="reconcile-title"
     >
       <header class="dialog-header">
-        <h2 id="reconcile-title">تطبیق وضعیت با n8n</h2>
+        <h2 id="reconcile-title">Reconcile with n8n</h2>
         <button
           class="icon-button"
           data-close="reconcile-dialog"
-          aria-label="بستن تطبیق وضعیت"
+          aria-label="Close reconciliation"
         >
           <span data-icon="close"></span>
         </button>
       </header>
       <p class="dialog-intro">
-        ممکن است درخواست قبلی انجام شده باشد ولی پاسخ آن نرسیده باشد. این مرحله
-        فقط وضعیت موجود را می‌خواند.
+        The previous request may have succeeded without a response.
+        Reconciliation only reads the current state.
       </p>
       <form id="reconcile-form">
-        <label for="remote-id">شناسهٔ Workflow در n8n</label
+        <label for="remote-id">n8n workflow ID</label
         ><input
           id="remote-id"
           dir="ltr"
           pattern="[a-zA-Z0-9_-]{1,80}"
           placeholder="Workflow ID"
         /><button class="primary-button full-width" type="submit">
-          خواندن و تطبیق وضعیت
+          Read & reconcile status
         </button>
       </form>
     </dialog>
@@ -486,70 +491,70 @@
       <header class="dialog-header">
         <div>
           <span class="eyebrow">BISCODE LOCAL AGENT</span>
-          <h2 id="local-agent-title">ابزارها و اتصال‌های محلی</h2>
+          <h2 id="local-agent-title">Local tools & connections</h2>
         </div>
         <button
           class="icon-button"
           data-close="local-agent-dialog"
-          aria-label="بستن پنل Local Agent"
+          aria-label="Close Local Agent"
         >
           <span data-icon="close"></span>
         </button>
       </header>
       <div class="local-tabs" id="local-tabs">
-        <button data-local-tab="access" class="active">دسترسی سیستم</button
-        ><button data-local-tab="connections">اتصال‌ها</button
-        ><button data-local-tab="automation">اجرای اتوماسیون</button
-        ><button data-local-tab="activity">گزارش فعالیت</button>
+        <button data-local-tab="access" class="active">Access</button
+        ><button data-local-tab="connections">Connections</button
+        ><button data-local-tab="automation">Automation</button
+        ><button data-local-tab="activity">Activity</button>
       </div>
       <div id="local-panel-error" class="form-error" role="alert" hidden></div>
       <section data-local-panel="access">
         <p class="dialog-intro">
-          برای کار با فایل‌ها یا اجرای فرمان، سطح دسترسی همین گفتگو را انتخاب
-          کن. کلیدها و ورود به حساب‌ها از بخش اتصال‌ها مدیریت می‌شوند.
+          Choose this chat's access level for files and commands. Manage
+          credentials and account sign-in under Connections.
         </p>
         <p id="local-workspace" class="service-detail"></p>
         <form id="local-grant-form">
-          <label for="local-workspace-input">پوشهٔ مجاز این گفتگو</label
+          <label for="local-workspace-input">Allowed folder for this chat</label
           ><input
             id="local-workspace-input"
             dir="ltr"
             placeholder="/absolute/path/to/project"
           />
-          <label for="local-access-mode">سطح دسترسی</label
+          <label for="local-access-mode">Access level</label
           ><select id="local-access-mode">
-            <option value="off">خاموش</option>
-            <option value="workspace">فایل‌های پوشهٔ پروژه</option>
+            <option value="off">Off</option>
+            <option value="workspace">Workspace files</option>
             <option value="system">
-              دسترسی سیستم با حساب کاربر + ترمینال
+              System access & terminal as the current user
             </option></select
           ><label class="check-label"
             ><input type="checkbox" id="local-system-confirm" /><span
-              >اجازه می‌دهم ابزارها در این گفتگو با دسترسی حساب کاربر روی سیستم
-              اجرا شوند. این حالت یک محیط ایزوله نیست.</span
+              >I allow tools in this chat to run commands with my OS user
+              permissions. This is not a sandbox.</span
             ></label
           ><button class="primary-button" type="submit">
-            اعمال برای ۴ ساعت
+            Apply for 4 hours
           </button>
         </form>
         <p id="local-current-grant" class="service-detail"></p>
-        <h3>ابزارهای آماده</h3>
+        <h3>Available tools</h3>
         <div id="local-tool-list" class="local-tool-list"></div>
         <details class="local-advanced">
-          <summary>کاتالوگ گره‌های n8n</summary>
+          <summary>n8n node catalog</summary>
           <p class="service-detail">
-            فایل خروجی دستور n8n export:nodes را در پوشهٔ پروژه قرار بده تا
-            گره‌های نصب‌شده به کاتالوگ اضافه شوند.
+            Place the output of n8n export:nodes in your workspace to import
+            installed node metadata into the catalog.
           </p>
           <form id="catalog-import-form">
-            <label for="catalog-file">مسیر فایل JSON در پروژه</label
+            <label for="catalog-file">JSON file path in the workspace</label
             ><input
               id="catalog-file"
               dir="ltr"
               placeholder="work/n8n-nodes.json"
               required
             /><button class="secondary-button" type="submit">
-              واردکردن کاتالوگ
+              Import catalog
             </button>
           </form>
           <p id="local-catalog-count" class="service-detail"></p>
@@ -557,16 +562,17 @@
       </section>
       <section data-local-panel="connections" hidden>
         <p class="dialog-intro">
-          بات تلگرام، حساب شخصی یا یک سرویس HTTP را اضافه کن. اطلاعات حساس رمز
-          می‌شوند و به مدل فرستاده نمی‌شوند.
+          Add a Telegram bot, personal account, or HTTP service. Credentials are
+          encrypted and are not sent to the model.
         </p>
         <div id="local-connection-list"></div>
         <details class="local-advanced" open>
-          <summary>افزودن اتصال</summary>
+          <summary>Add a connection</summary>
           <form id="local-connection-form" autocomplete="off">
             <div class="local-form-grid">
               <div>
-                <label for="connector-id">شناسهٔ اتصال (انگلیسی)</label
+                <label for="connector-id"
+                  >Connection ID (Latin characters)</label
                 ><input
                   id="connector-id"
                   pattern="[a-z][a-z0-9_]{0,39}"
@@ -576,19 +582,24 @@
                 />
               </div>
               <div>
-                <label for="connector-label">نام نمایشی</label
-                ><input id="connector-label" required placeholder="تلگرام من" />
+                <label for="connector-label">Display name</label
+                ><input
+                  id="connector-label"
+                  dir="auto"
+                  required
+                  placeholder="My Telegram"
+                />
               </div>
             </div>
-            <label for="connector-kind">نوع اتصال</label
+            <label for="connector-kind">Connection type</label
             ><select id="connector-kind">
-              <option value="telegram_bot">بات تلگرام · BotFather</option>
-              <option value="telegram_user">اکانت شخصی تلگرام</option>
-              <option value="http">API دلخواه · HTTP</option>
+              <option value="telegram_bot">Telegram bot · BotFather</option>
+              <option value="telegram_user">Telegram personal account</option>
+              <option value="http">Custom HTTP API</option>
             </select>
             <div id="connector-token-fields">
               <label for="connector-token"
-                >توکن بات یا مقدار Header احراز هویت</label
+                >Bot token or authentication header value</label
               ><input
                 id="connector-token"
                 type="password"
@@ -611,29 +622,30 @@
                 autocomplete="off"
               />
               <p class="service-detail">
-                این دو مقدار را از بخش API development tools در my.telegram.org
-                دریافت کن. ورود با شماره و کد، بعد از ثبت اتصال انجام می‌شود.
+                Get these values from API development tools at my.telegram.org.
+                After saving the connection, sign in with your phone number and
+                login code.
               </p>
             </div>
             <div id="connector-http-fields" hidden>
-              <label for="connector-base-url">آدرس پایهٔ API</label
+              <label for="connector-base-url">API base URL</label
               ><input
                 id="connector-base-url"
                 type="url"
                 placeholder="https://api.example.com"
                 dir="ltr"
-              /><label for="connector-header">نام Header</label
+              /><label for="connector-header">Header name</label
               ><input id="connector-header" value="Authorization" dir="ltr" />
             </div>
             <button class="primary-button" type="submit">
-              ذخیرهٔ رمز‌شدهٔ اتصال
+              Save encrypted connection
             </button>
           </form>
         </details>
         <section id="telegram-login-panel" class="local-login-panel" hidden>
-          <h3 id="telegram-login-title">ورود به حساب شخصی</h3>
+          <h3 id="telegram-login-title">Sign in to personal account</h3>
           <form id="telegram-phone-form">
-            <label for="telegram-phone">شماره با کد کشور</label
+            <label for="telegram-phone">Phone number with country code</label
             ><input
               id="telegram-phone"
               type="tel"
@@ -642,11 +654,11 @@
               autocomplete="off"
               required
             /><button class="primary-button" type="submit">
-              درخواست کد ورود
+              Request login code
             </button>
           </form>
           <form id="telegram-code-form" hidden>
-            <label for="telegram-login-code">کد ورود تلگرام</label
+            <label for="telegram-login-code">Telegram login code</label
             ><input
               id="telegram-login-code"
               inputmode="numeric"
@@ -654,77 +666,82 @@
               autocomplete="off"
             />
             <div id="telegram-password-fields" hidden>
-              <label for="telegram-login-password">رمز تأیید دومرحله‌ای</label
+              <label for="telegram-login-password"
+                >Two-step verification password</label
               ><input
                 id="telegram-login-password"
                 type="password"
                 autocomplete="off"
               />
             </div>
-            <button class="primary-button" type="submit">تکمیل ورود</button>
+            <button class="primary-button" type="submit">
+              Complete sign-in
+            </button>
           </form>
           <button class="text-button" id="telegram-cancel-login">
-            لغو ورود
+            Cancel sign-in
           </button>
         </section>
       </section>
       <section data-local-panel="automation" hidden>
         <p class="dialog-intro">
-          ابتدا Workflow را در پنل کناری بساز، به n8n بفرست و پس از بازبینی فعال
-          کن. سپس آن را به اتصال تلگرام وصل کن.
+          Build a workflow, deploy it to n8n, and activate it after review. Then
+          bind it to your Telegram connection.
         </p>
         <div id="local-binding-list"></div>
         <form id="local-binding-form">
-          <label for="binding-connection">اتصال تلگرام</label
+          <label for="binding-connection">Telegram connection</label
           ><select id="binding-connection" required></select
-          ><label for="binding-build">Workflow ساخته‌شده</label
+          ><label for="binding-build">Workflow build</label
           ><select id="binding-build" required></select
-          ><label for="binding-chats"
-            >شناسهٔ گفتگوهای مجاز (با کاما جدا کن)</label
+          ><label for="binding-chats">Allowed chat IDs (comma-separated)</label
           ><input
             id="binding-chats"
             placeholder="123456, -100123456789"
             dir="ltr"
           />
           <p class="service-detail">
-            برای حساب شخصی انتخاب گفتگو ضروری است. برای بات، خالی‌گذاشتن یعنی
-            همهٔ گفتگوهای بات.
+            Personal accounts require an explicit chat selection. For bots,
+            leave this empty to allow all bot chats.
           </p>
           <button class="text-button" type="button" id="load-telegram-dialogs">
-            نمایش گفتگوهای اکانت شخصی
+            Browse personal account chats
           </button>
           <div id="telegram-dialog-list"></div>
-          <label for="binding-reply-path">مسیر متن پاسخ در خروجی Workflow</label
+          <label for="binding-reply-path"
+            >Reply text path in the workflow output</label
           ><input
             id="binding-reply-path"
             value="message.content"
             dir="ltr"
           /><button class="primary-button" type="submit">
-            ثبت اتصال به Workflow
+            Save workflow binding
           </button>
         </form>
         <label class="check-label"
           ><input type="checkbox" id="binding-start-confirm" /><span
-            >شروع پردازش خودکار پیام‌ها و ارسال پاسخ در گفتگوهای انتخاب‌شده را
-            تأیید می‌کنم.</span
+            >I approve automatic message processing and replies in the selected
+            chats.</span
           ></label
         >
         <p class="service-detail">
-          اولین شروع حساب شخصی از پیام‌های جدید ادامه می‌دهد؛ تاریخچهٔ قدیمی
-          خودکار پردازش نمی‌شود.
+          Personal account listeners start with new messages. Existing chat
+          history is not processed automatically.
         </p>
       </section>
       <section data-local-panel="activity" hidden>
         <p class="dialog-intro">
-          فعالیت ابزارها و وضعیت تحویل پیام‌ها ثبت می‌شود. نتیجهٔ نامشخص دوباره
-          به‌صورت خودکار ارسال نمی‌شود.
+          Tool activity and message delivery states are recorded. Uncertain
+          operations are not retried automatically.
         </p>
         <div id="local-inbox"></div>
         <div id="local-audit"></div>
       </section>
       <footer class="dialog-footer">
-        <button class="text-button" id="local-refresh">تازه‌کردن وضعیت</button
-        ><span class="service-detail">کلیدهای اصلی در اختیار مدل نیستند.</span>
+        <button class="text-button" id="local-refresh">Refresh status</button
+        ><span class="service-detail"
+          >Credentials are not exposed to the model.</span
+        >
       </footer>
     </dialog>
     <dialog
@@ -735,12 +752,12 @@
       <header class="dialog-header">
         <div>
           <p class="eyebrow">BISCODE · LOCAL ACCESS</p>
-          <h2 id="coding-access-title">اجازهٔ کار روی سیستم</h2>
+          <h2 id="coding-access-title">Approve local access</h2>
         </div>
         <button
           class="icon-button"
           data-close="coding-access-dialog"
-          aria-label="بستن درخواست دسترسی"
+          aria-label="Close access request"
         >
           <span data-icon="close"></span>
         </button>
@@ -748,39 +765,37 @@
       <p id="access-reason" class="dialog-intro"></p>
       <p id="access-status" class="service-detail"></p>
       <form id="access-form">
-        <label for="access-folder">پوشهٔ کار</label
+        <label for="access-folder">Workspace folder</label
         ><input id="access-folder" dir="ltr" required />
-        <label for="access-level">محدودهٔ اجازه</label
+        <label for="access-level">Access scope</label
         ><select id="access-level">
-          <option value="workspace">
-            فقط خواندن و نوشتن فایل‌های این پوشه
-          </option>
-          <option value="system">فایل‌ها و اجرای فرمان با حساب کاربر</option>
+          <option value="workspace">Read and write files in this folder</option>
+          <option value="system">Files and commands as the current user</option>
         </select>
         <p class="service-detail">
-          اجازه برای همین گفتگو و ۴ ساعت است. اجرای فرمان با دسترسی حساب کاربر
-          انجام می‌شود و محیط ایزوله نیست. می‌توانی کار جاری را با «توقف کار»
-          قطع کنی.
+          Access applies to this chat for 4 hours. Commands run with your OS
+          user permissions, outside a sandbox. Use Stop to interrupt the current
+          task.
         </p>
         <label class="check-label"
           ><input type="checkbox" id="access-confirm" required /><span
-            >پوشه و سطح دسترسی را بررسی کردم و اجازهٔ ادامهٔ همین درخواست را
-            می‌دهم.</span
+            >I have reviewed the folder and access scope and approve continuing
+            this request.</span
           ></label
         >
         <div id="access-error" class="form-error" role="alert" hidden></div>
         <div class="coding-actions">
           <button class="primary-button" id="access-approve" type="submit">
-            اجازه و ادامه</button
+            Approve & continue</button
           ><button type="button" class="secondary-button" id="access-reject">
-            اجازه نمی‌دهم</button
+            Decline</button
           ><button
             type="button"
             class="secondary-button"
             id="access-resume"
             hidden
           >
-            ادامهٔ درخواست تأییدشده
+            Resume approved request
           </button>
         </div>
       </form>
@@ -793,27 +808,27 @@
       <header class="dialog-header">
         <div>
           <p class="eyebrow">BISCODE · CODE WORKSPACE</p>
-          <h2 id="coding-projects-title">پروژه‌ها و تغییرات کد</h2>
+          <h2 id="coding-projects-title">Projects & code changes</h2>
         </div>
         <button
           class="icon-button"
           data-close="coding-projects-dialog"
-          aria-label="بستن پروژه‌ها"
+          aria-label="Close projects"
         >
           <span data-icon="close"></span>
         </button>
       </header>
       <p class="dialog-intro">
-        فایل‌های واقعی، خروجی آخرین تست و تغییرات ثبت‌شده را اینجا بررسی کن.
-        ساخت پروژه، سرویس آن را خودکار روشن نمی‌کند.
+        Review project files, test output, and recorded changes. Creating a
+        project does not start its service automatically.
       </p>
       <div id="coding-error" class="form-error" role="alert" hidden></div>
       <div id="coding-project-list"></div>
       <div class="coding-actions">
         <button class="secondary-button" id="coding-refresh">
-          تازه‌کردن پروژه‌ها</button
+          Refresh projects</button
         ><button class="secondary-button" id="coding-show-changes">
-          تغییرات این گفتگو
+          Changes in this chat
         </button>
       </div>
       <div id="coding-changes"></div>

@@ -1,5 +1,5 @@
-import { mountLocalAgent } from "./local-ui.mjs";
-import { mountCoding } from "./coding-ui.mjs";
+import { mountLocalAgent } from "./local-ui.mjs?v=0.4.1";
+import { mountCoding } from "./coding-ui.mjs?v=0.4.1";
 import {
   statuses,
   nodeKinds,
@@ -8,7 +8,7 @@ import {
   EventParser,
   errorMessage,
   nodeDetail,
-} from "./ui-utils.mjs";
+} from "./ui-utils.mjs?v=0.4.1";
 
 const $ = (id) => document.getElementById(id);
 const shapes = {
@@ -70,7 +70,10 @@ function hydrateIcons(root = document) {
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
+  if (text !== undefined) {
+    node.textContent = text;
+    node.dir = "auto";
+  }
   return node;
 }
 function button(text, action, className = "secondary-button", glyph) {
@@ -118,9 +121,9 @@ const state = {
   deletingChat: null,
 };
 let toastTimer, elapsedTimer, pollTimer, codingUI;
-const faNumber = (value) => new Intl.NumberFormat("fa-IR").format(value);
+const formatNumber = (value) => new Intl.NumberFormat("en-US").format(value);
 const time = (value) =>
-  new Intl.DateTimeFormat("fa-IR", {
+  new Intl.DateTimeFormat("en-US", {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
@@ -181,11 +184,11 @@ function setBusy(busy) {
   clearInterval(elapsedTimer);
   if (busy) {
     const started = Date.now();
-    $("elapsed").textContent = "۰:۰۰";
+    $("elapsed").textContent = "0:00";
     elapsedTimer = setInterval(() => {
       const seconds = Math.floor((Date.now() - started) / 1000);
       $("elapsed").textContent =
-        `${faNumber(Math.floor(seconds / 60))}:${faNumber(seconds % 60).padStart(2, "۰")}`;
+        `${formatNumber(Math.floor(seconds / 60))}:${formatNumber(seconds % 60).padStart(2, "0")}`;
     }, 1000);
   }
 }
@@ -197,7 +200,7 @@ function scrollBottom() {
 function setStage(stage, attempt) {
   $("progress-label").textContent =
     (stageLabels[stage] || stageLabels.thinking) +
-    (attempt > 1 ? ` (تلاش ${faNumber(attempt)})` : "");
+    (attempt > 1 ? ` (attempt ${formatNumber(attempt)})` : "");
 }
 function renderHistory() {
   const container = $("chat-history");
@@ -212,15 +215,15 @@ function renderHistory() {
         "p",
         "history-empty",
         query
-          ? "گفتگویی پیدا نشد."
+          ? "No chats found."
           : state.key
-            ? "اولین گفتگو را شروع کن؛ اینجا ذخیره می‌شود."
-            : "گفتگوها بعد از اتصال اینجا نمایش داده می‌شوند.",
+            ? "Start a conversation. Your chats will appear here."
+            : "Connect your workspace to see your chats.",
       ),
     );
   let group;
   for (const chat of chats) {
-    const nextGroup = chat.pinned ? "پین‌شده‌ها" : "گفتگوهای قبلی";
+    const nextGroup = chat.pinned ? "Pinned" : "Previous chats";
     if (group !== nextGroup) {
       container.append(el("div", "history-group", nextGroup));
       group = nextGroup;
@@ -259,7 +262,7 @@ function renderHistory() {
       "icon-button history-action",
       "pin",
     );
-    pin.title = chat.pinned ? "برداشتن پین" : "پین کردن گفتگو";
+    pin.title = chat.pinned ? "Unpin chat" : "Pin chat";
     pin.setAttribute("aria-label", `${pin.title}: ${chat.title}`);
     pin.setAttribute("aria-pressed", String(Boolean(chat.pinned)));
     const remove = button(
@@ -273,10 +276,11 @@ function renderHistory() {
       "icon-button history-action delete-chat",
       "trash",
     );
-    remove.title = "حذف گفتگو";
-    remove.setAttribute("aria-label", `حذف گفتگو: ${chat.title}`);
+    remove.title = "Delete chat";
+    remove.setAttribute("aria-label", `Delete chat: ${chat.title}`);
     remove.disabled = chat.status === "busy" || state.busyChat === chat.id;
-    if (remove.disabled) remove.title = "برای حذف، ابتدا کار جاری را متوقف کن";
+    if (remove.disabled)
+      remove.title = "Stop the current task before deleting this chat";
     actions.append(pin, remove);
     row.append(item, actions);
     container.append(row);
@@ -287,7 +291,7 @@ async function refreshLists() {
   const [history, builds] = await Promise.all([api("/chats"), api("/builds")]);
   state.chats = history.chats;
   state.builds = builds.builds;
-  $("workflow-count").textContent = faNumber(state.builds.length);
+  $("workflow-count").textContent = formatNumber(state.builds.length);
   renderHistory();
 }
 function newChat() {
@@ -295,7 +299,7 @@ function newChat() {
   state.chat = null;
   state.selectedBuild = null;
   safelyStore("master-chat", null);
-  $("chat-title").textContent = "گفتگوی تازه";
+  $("chat-title").textContent = "New chat";
   $("welcome").hidden = false;
   $("messages").replaceChildren();
   $("prompt").value = "";
@@ -360,13 +364,14 @@ function renderMessages() {
       el(
         "div",
         "message-role",
-        message.role === "assistant" ? "BisCode" : "تو",
+        message.role === "assistant" ? "BisCode" : "You",
       ),
     );
     const content = el("div", "message-content");
+    content.dir = "auto";
     if (message.status === "pending") {
       const dots = el("span", "typing-dots");
-      dots.setAttribute("aria-label", "در حال پاسخ‌دادن");
+      dots.setAttribute("aria-label", "Preparing a response");
       for (let i = 0; i < 3; i++) dots.append(el("i"));
       content.append(dots);
     } else if (message.role === "assistant")
@@ -386,16 +391,16 @@ function renderMessages() {
       card.append(icon("workflow"));
       const text = el("div");
       text.append(
-        el("strong", "", summary?.name || "طرح Workflow آماده است"),
+        el("strong", "", summary?.name || "Workflow ready for review"),
         el(
           "small",
           "",
           summary
-            ? `${faNumber(summary.node_count)} گره · ${statuses[summary.status] || summary.status}`
-            : "بازکردن طرح و جزئیات",
+            ? `${formatNumber(summary.node_count)} nodes · ${statuses[summary.status] || summary.status}`
+            : "Open workflow details",
         ),
       );
-      card.append(text, el("span", "build-card-label", "دیدن طرح"));
+      card.append(text, el("span", "build-card-label", "View workflow"));
       body.append(card);
     }
     if (message.role === "assistant" && message.status !== "pending") {
@@ -406,8 +411,8 @@ function renderMessages() {
         "icon-button",
         "copy",
       );
-      copy.title = "کپی پاسخ";
-      copy.setAttribute("aria-label", "کپی پاسخ");
+      copy.title = "Copy response";
+      copy.setAttribute("aria-label", "Copy response");
       actions.append(
         copy,
         el("span", "message-time", time(message.created_at)),
@@ -490,9 +495,11 @@ function renderMarkdown(root, text) {
 async function copyText(text) {
   try {
     await navigator.clipboard.writeText(text);
-    toast("کپی شد.");
+    toast("Copied.");
   } catch {
-    toast("مرورگر اجازهٔ کپی نداد. متن را انتخاب و کپی کن.");
+    toast(
+      "Clipboard access is unavailable. Select and copy the text manually.",
+    );
   }
 }
 async function selectBuild(id) {
@@ -519,11 +526,7 @@ function renderFlow(ir) {
         el(
           "div",
           "flow-connector",
-          port === "true"
-            ? "اگر شرط برقرار باشد"
-            : port === "false"
-              ? "در غیر این صورت"
-              : "",
+          port === "true" ? "If true" : port === "false" ? "Otherwise" : "",
         ),
       );
     const card = el("div", "flow-node");
@@ -543,7 +546,7 @@ function renderFlow(ir) {
     if (node.kind === "ollama_chat") {
       const details = el("details", "node-instructions");
       details.append(
-        el("summary", "", "دستورالعمل مدل"),
+        el("summary", "", "Model instructions"),
         el("p", "", node.system_prompt),
       );
       info.append(details);
@@ -591,8 +594,12 @@ function renderInspector() {
     const empty = el("div", "inspector-empty");
     empty.append(
       icon("workflow"),
-      el("h2", "", "اینجا، ایده شکل می‌گیرد."),
-      el("p", "", "بعد از ساخت، گره‌ها و اتصال‌های Workflow را اینجا می‌بینی."),
+      el("h2", "", "Your workflow takes shape here."),
+      el(
+        "p",
+        "",
+        "Build a workflow to inspect its nodes and connections here.",
+      ),
     );
     root.append(empty);
     return;
@@ -604,14 +611,14 @@ function renderInspector() {
     el(
       "p",
       "",
-      `${faNumber(build.ir.nodes.length)} گره · ${faNumber(build.ir.edges.length)} اتصال · n8n Workflow`,
+      `${formatNumber(build.ir.nodes.length)} nodes · ${formatNumber(build.ir.edges.length)} connections · n8n workflow`,
     ),
   );
   root.append(heading);
   const tabs = el("div", "blueprint-tabs");
   tabs.setAttribute("role", "tablist");
   for (const [value, text] of [
-    ["flow", "طرح"],
+    ["flow", "Workflow"],
     ["json", "JSON"],
   ]) {
     const tab = button(
@@ -635,7 +642,7 @@ function renderInspector() {
   const actions = el("div", "blueprint-actions");
   if (build.status === "draft") {
     const send = actionButton(
-      "ارسال به n8n",
+      "Deploy to n8n",
       async () => {
         const result = await api(`/builds/${build.id}/deploy`, {
           method: "POST",
@@ -644,7 +651,7 @@ function renderInspector() {
         await refreshLists();
         renderInspector();
         renderMessages();
-        toast("Workflow در n8n ساخته شد؛ هنوز غیرفعال است.");
+        toast("Workflow created in n8n. It is still inactive.");
       },
       "workflow",
       true,
@@ -656,14 +663,14 @@ function renderInspector() {
         "p",
         "action-note",
         send.disabled
-          ? "برای ارسال، ابتدا اتصال n8n را کامل کن."
-          : "به‌صورت غیرفعال ساخته می‌شود.",
+          ? "Connect n8n before deploying."
+          : "The workflow will be created inactive.",
       ),
     );
     if (send.disabled)
       actions.append(
         button(
-          "راهنمای اتصال n8n",
+          "How to connect n8n",
           () => showDialog("help-dialog"),
           "text-button",
           "link",
@@ -672,7 +679,7 @@ function renderInspector() {
   } else if (build.status === "deployed") {
     actions.append(
       actionButton(
-        "بازبینی و فعال‌سازی",
+        "Review & activate",
         () => openReview(build.id),
         "shield",
         true,
@@ -682,13 +689,13 @@ function renderInspector() {
       el(
         "p",
         "action-note",
-        "فعال‌سازی بعد از بازبینی و تأیید تو انجام می‌شود.",
+        "Activation requires your review and explicit approval.",
       ),
     );
   } else if (build.status === "active") {
     actions.append(
       actionButton(
-        "غیرفعال‌کردن Workflow",
+        "Deactivate workflow",
         async () => {
           state.selectedBuild = await api(`/builds/${build.id}/deactivate`, {
             method: "POST",
@@ -696,7 +703,7 @@ function renderInspector() {
           await refreshLists();
           renderInspector();
           renderMessages();
-          toast("Workflow غیرفعال شد.");
+          toast("Workflow deactivated.");
         },
         "pause",
       ),
@@ -706,12 +713,12 @@ function renderInspector() {
       el(
         "p",
         "action-note",
-        "نتیجهٔ درخواست قبلی مشخص نیست؛ وضعیت را با n8n تطبیق بده.",
+        "The previous request has an uncertain outcome. Reconcile its status with n8n.",
       ),
     );
     actions.append(
       button(
-        "تطبیق وضعیت",
+        "Reconcile status",
         () => {
           $("remote-id").value = build.n8n_workflow_id || "";
           $("remote-id").required = !build.n8n_workflow_id;
@@ -724,7 +731,7 @@ function renderInspector() {
   } else
     actions.append(
       button(
-        "تازه‌کردن وضعیت",
+        "Refresh status",
         () => selectBuild(build.id).catch(showError),
         "secondary-button",
         "refresh",
@@ -732,7 +739,7 @@ function renderInspector() {
     );
   actions.append(
     actionButton(
-      "دریافت فایل JSON",
+      "Download JSON",
       async () => {
         const data = await api(`/builds/${build.id}/workflow`);
         const url = URL.createObjectURL(
@@ -750,7 +757,7 @@ function renderInspector() {
     ),
   );
   if (build.n8n_workflow_id && state.config) {
-    const link = el("a", "secondary-button", "بازکردن در n8n");
+    const link = el("a", "secondary-button", "Open in n8n");
     link.href = `${state.config.n8n_editor_url}/workflow/${encodeURIComponent(build.n8n_workflow_id)}`;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
@@ -766,7 +773,7 @@ function renderInspector() {
   root.append(warnings);
   const meta = el("div", "blueprint-meta");
   meta.append(
-    el("span", "", "IR 1.0 · اعتبارسنجی‌شده"),
+    el("span", "", "IR 1.0 · validated"),
     el("span", "", time(build.created_at)),
   );
   root.append(meta);
@@ -783,17 +790,13 @@ async function openReview(buildId) {
   const box = el("div", "review-summary");
   box.append(
     el("strong", "", review.remote_workflow.name),
-    el(
-      "p",
-      "",
-      "با فعال‌شدن، Webhook یا زمان‌بندی این Workflow می‌تواند شروع به کار کند.",
-    ),
+    el("p", "", "Activating this workflow can start its webhook or schedule."),
   );
   const destinations = review.remote_workflow.nodes
     .filter((node) => node.parameters.url)
     .map((node) => node.parameters.url);
   for (const url of destinations)
-    box.append(el("p", "", `مقصد درخواست: ${url}`));
+    box.append(el("p", "", `Request destination: ${url}`));
   root.append(box);
   for (const warning of review.warnings)
     root.append(
@@ -808,7 +811,7 @@ async function openReview(buildId) {
   );
   const details = el("details");
   details.append(
-    el("summary", "", "نمایش کامل نسخهٔ در حال تأیید"),
+    el("summary", "", "View the complete version under review"),
     el("pre", "json-view", JSON.stringify(review.remote_workflow, null, 2)),
   );
   root.append(details);
@@ -824,16 +827,16 @@ function renderServices() {
     [
       "Ollama",
       ollama?.model_installed,
-      ollama?.model_installed ? "مدل آماده است" : "مدل در دسترس نیست",
+      ollama?.model_installed ? "Model ready" : "Model unavailable",
     ],
     [
       "n8n",
       n8n?.api_authenticated,
       n8n?.api_authenticated
-        ? "متصل"
+        ? "Connected"
         : n8n?.error === "not_configured"
-          ? "کلید API تنظیم نشده"
-          : "اتصال برقرار نیست",
+          ? "API key not configured"
+          : "Not connected",
     ],
   ]) {
     const row = el("div", "service-row");
@@ -842,7 +845,7 @@ function renderServices() {
   }
   if (state.config)
     root.append(
-      el("p", "service-detail", `مدل انتخاب‌شده: ${state.config.model}`),
+      el("p", "service-detail", `Selected model: ${state.config.model}`),
     );
 }
 async function refreshSystem() {
@@ -853,13 +856,13 @@ async function refreshSystem() {
   state.config = config;
   state.system = system;
   $("model-label").textContent = config.model;
-  $("profile-state").textContent = "فضای کاری متصل";
+  $("profile-state").textContent = "Workspace connected";
   const ready = system.ollama?.model_installed;
   $("connection-label").textContent = ready
     ? system.n8n?.api_authenticated
-      ? "Ollama و n8n متصل‌اند"
-      : "مدل آماده · n8n تنظیم نشده"
-    : "مدل در دسترس نیست";
+      ? "Ollama & n8n connected"
+      : "Model ready · n8n not configured"
+    : "Model unavailable";
   $("connection-dot").className =
     `status-dot ${ready && system.n8n?.api_authenticated ? "connected" : "partial"}`;
   $("logout-button").hidden = false;
@@ -880,7 +883,7 @@ async function connect(event) {
     safelyStore("master-session", $("remember-key").checked ? key : null);
     $("api-key").value = "";
     $("settings-dialog").close();
-    toast("به فضای کاری متصل شدی.");
+    toast("Connected to your workspace.");
     if (state.pendingSend) {
       state.pendingSend = false;
       await submit();
@@ -915,13 +918,13 @@ function logout() {
   newChat();
   $("workflow-count").textContent = "—";
   $("model-label").textContent = "Ollama · Local";
-  $("connection-label").textContent = "اتصال به فضای کاری";
+  $("connection-label").textContent = "Connect workspace";
   $("connection-dot").className = "status-dot";
-  $("profile-state").textContent = "اتصال به مدل محلی";
+  $("profile-state").textContent = "Local model connection";
   $("logout-button").hidden = true;
   renderServices();
   $("settings-dialog").close();
-  toast("اتصال این تب قطع شد.");
+  toast("Disconnected this tab.");
 }
 async function submit(event, resume = null) {
   event?.preventDefault();
@@ -1047,13 +1050,14 @@ async function submit(event, resume = null) {
         }
       } else if (event.type === "permission_required") {
         pendingAccess = event.access_request;
-        $("progress-label").textContent = "ادامهٔ کار منتظر اجازهٔ دسترسی توست…";
+        $("progress-label").textContent = "Waiting for your access approval…";
       } else if (event.type === "stage") {
         setStage(event.stage, event.attempt);
         if (event.tool)
-          $("progress-label").textContent = "در حال اجرای ابزار: " + event.tool;
+          $("progress-label").textContent = "Running tool: " + event.tool;
         if (event.step)
-          $("progress-label").textContent += " · مرحلهٔ " + faNumber(event.step);
+          $("progress-label").textContent +=
+            " · Step " + formatNumber(event.step);
       } else if (event.type === "complete" || event.type === "failed") {
         finished = true;
         pendingAccess = event.message.access_request || pendingAccess;
@@ -1121,10 +1125,11 @@ async function submit(event, resume = null) {
       state.busyChat = null;
       state.streamController = null;
       setBusy(state.chat?.status === "busy" && started && !finished);
+      renderHistory();
       if (state.chat?.status === "busy" && !finished) schedulePoll(chatId);
       $("prompt").focus();
       if (finished && pendingAccess && state.chat?.id === chatId) {
-        toast("برای ادامهٔ کدنویسی، پوشه و دسترسی را تأیید کن.");
+        toast("Review the folder and access level to continue coding.");
         await codingUI.openAccess(pendingAccess);
       }
     }
@@ -1172,7 +1177,7 @@ $("refresh-system").addEventListener("click", async () => {
   if (!requireConnection()) return;
   try {
     await refreshSystem();
-    toast("وضعیت اتصال‌ها تازه شد.");
+    toast("Connection status refreshed.");
   } catch (error) {
     showError(error);
   }
@@ -1224,7 +1229,7 @@ $("approve-button").addEventListener("click", async () => {
     await refreshLists();
     renderInspector();
     renderMessages();
-    toast("همین نسخه با تأیید تو فعال شد.");
+    toast("The reviewed version was activated with your approval.");
   } catch (error) {
     $("review-dialog").close();
     showError(error);
@@ -1239,11 +1244,7 @@ $("all-workflows").addEventListener("click", async () => {
     root.replaceChildren();
     if (!state.builds.length)
       root.append(
-        el(
-          "p",
-          "list-empty",
-          "هنوز Workflowای نساخته‌ای. از یک گفتگو شروع کن.",
-        ),
+        el("p", "list-empty", "No workflows yet. Start with a conversation."),
       );
     for (const build of state.builds) {
       const item = button(
@@ -1261,7 +1262,7 @@ $("all-workflows").addEventListener("click", async () => {
         el(
           "small",
           "",
-          `${faNumber(build.node_count)} گره · ${time(build.updated_at)}`,
+          `${formatNumber(build.node_count)} nodes · ${time(build.updated_at)}`,
         ),
       );
       item.append(icon("workflow"), info, badge(build.status));
@@ -1287,7 +1288,7 @@ $("reconcile-form").addEventListener("submit", async (event) => {
     $("reconcile-dialog").close();
     await refreshLists();
     renderInspector();
-    toast("وضعیت واقعی از n8n خوانده شد.");
+    toast("Status reconciled with n8n.");
   } catch (error) {
     showError(error);
   } finally {
@@ -1329,12 +1330,12 @@ $("delete-chat-form").addEventListener("submit", async (event) => {
     state.deletingChat = null;
     $("delete-chat-dialog").close();
     await refreshLists();
-    toast("گفتگو حذف شد.");
+    toast("Chat deleted.");
   } catch (error) {
     if (error.message !== "session_changed") {
       $("delete-chat-error").textContent =
         error.status === 409
-          ? "برای حذف این گفتگو، ابتدا کار جاری را متوقف کن."
+          ? "Stop the current task before deleting this chat."
           : errorMessage(error);
       $("delete-chat-error").hidden = false;
     }
@@ -1380,7 +1381,7 @@ codingUI = mountCoding({
   requireConnection,
   resume: async (record) => {
     if (state.busy) {
-      toast("ابتدا کار جاری را متوقف یا تمام کن.");
+      toast("Stop or finish the current task first.");
       return;
     }
     await loadChat(record.chat_id);
@@ -1388,7 +1389,7 @@ codingUI = mountCoding({
       (m) => m.id === record.message_id,
     );
     if (!original) {
-      toast("درخواست اصلی در گفتگو پیدا نشد.");
+      toast("The original request could not be found in this chat.");
       return;
     }
     await submit(null, { ...record, content: original.content });

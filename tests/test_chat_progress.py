@@ -117,7 +117,7 @@ def test_repeated_identical_read_executes_once_and_stops_before_budget(api, netw
     network.chat_outputs = [tool("system.inspect")]
     cid, events = send(api, "وضعیت سیستم را بررسی کن")
     failed = next(e for e in events if e["type"] == "failed")
-    assert "همان ورودی" in failed["message"]["content"]
+    assert "same input" in failed["message"]["content"]
     assert "تعداد مراحل" not in failed["message"]["content"]
     assert tool_calls(api, cid) == ["system.inspect"]
     assert network.chat_calls == 3

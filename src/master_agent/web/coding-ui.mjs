@@ -18,7 +18,7 @@ export function mountCoding({
     $("coding-error").textContent =
       typeof error.detail === "string"
         ? error.detail
-        : "عملیات کامل نشد؛ وضعیت پروژه و دسترسی را بررسی کن.";
+        : "Could not complete the operation. Check the project status and access permissions.";
     $("coding-error").hidden = false;
   }
   async function openAccess(record, { pendingOnly = false } = {}) {
@@ -36,10 +36,10 @@ export function mountCoding({
       $("access-resume").hidden = currentRequest.status !== "approved";
       $("access-status").textContent =
         {
-          pending: "منتظر اجازهٔ تو",
-          approved: "اجازه ثبت شده است",
-          rejected: "اجازه داده نشد",
-          superseded: "درخواست تازه‌تری وجود دارد",
+          pending: "Waiting for your approval",
+          approved: "Access approved",
+          rejected: "Access denied",
+          superseded: "Superseded by a newer request",
         }[currentRequest.status] || currentRequest.status;
       showDialog("coding-access-dialog");
     } catch (error) {
@@ -69,7 +69,7 @@ export function mountCoding({
       $("access-error").textContent =
         typeof error.detail === "string"
           ? error.detail
-          : "اجازه ثبت نشد؛ تأیید، پوشه و وضعیت گفتگو را بررسی کن.";
+          : "Access was not approved. Check the confirmation, folder, and chat status.";
       $("access-error").hidden = false;
     } finally {
       $("access-approve").disabled = false;
@@ -82,7 +82,7 @@ export function mountCoding({
         method: "POST",
       });
       $("coding-access-dialog").close();
-      toast("درخواست دسترسی رد شد.");
+      toast("Access request declined.");
     } catch (error) {
       showError(error);
     }
@@ -129,7 +129,7 @@ export function mountCoding({
           el(
             "p",
             "service-detail",
-            "هنوز پروژهٔ Python در این گفتگو ساخته نشده است. روش ساخت را Python انتخاب کن و درخواستت را بنویس.",
+            "No Python agent projects in this chat yet. Choose Python agent as the build method to create one.",
           ),
         );
       for (const project of projects) {
@@ -140,33 +140,33 @@ export function mountCoding({
           el(
             "p",
             "service-detail",
-            `${project.files.length} فایل · ${project.status === "created" ? "فایل‌ها ساخته شده‌اند" : "ساخت ناقص؛ نیاز به بررسی"}`,
+            `${project.files.length} files · ${project.status === "created" ? "Files created" : "Incomplete — review required"}`,
           ),
         );
         const run = project.last_run;
-        let label = "تست هنوز اجرا نشده است";
+        let label = "Tests have not been run";
         if (run)
           label =
             run.status === "passed"
               ? project.checks_current
-                ? "آخرین بررسی: تست‌ها پاس شدند"
-                : "قبولی قبلی؛ فایل‌ها تغییر کرده‌اند"
+                ? "Latest check: tests passed"
+                : "Previous tests passed; files have changed"
               : run.status === "running"
-                ? "تست در حال اجراست"
+                ? "Tests running"
                 : run.status === "cancelled"
-                  ? "تست متوقف شد"
-                  : "آخرین بررسی: تست ناموفق";
+                  ? "Tests cancelled"
+                  : "Latest check: tests failed";
         card.append(el("p", "coding-check", label));
         const files = el("details");
         files.append(
-          el("summary", "", "فایل‌های پروژه"),
+          el("summary", "", "Project files"),
           el("pre", "coding-output", project.files.join("\n")),
         );
         card.append(files);
         if (run?.result) {
           const output = el("details");
           output.append(
-            el("summary", "", "خروجی واقعی آخرین تست"),
+            el("summary", "", "Latest test output"),
             el(
               "pre",
               "coding-output",
@@ -177,12 +177,12 @@ export function mountCoding({
         }
         card.append(
           button(
-            "دریافت پروژه ZIP",
+            "Download project ZIP",
             () => download(project).catch(fail),
             "secondary-button",
           ),
           button(
-            "مشاهدهٔ تغییرات",
+            "View changes",
             () => showChanges(project.chat_id).catch(fail),
             "secondary-button",
           ),
@@ -195,34 +195,30 @@ export function mountCoding({
   }
   async function showChanges(chatId = state.chat?.id) {
     if (!chatId) {
-      toast("ابتدا یک گفتگو انتخاب کن.");
+      toast("Select a chat first.");
       return;
     }
     const data = await api(
       "/local/code-changes?chat_id=" + encodeURIComponent(chatId),
     );
     const root = $("coding-changes");
-    root.replaceChildren(el("h3", "", "تغییرات ثبت‌شده در این گفتگو"));
+    root.replaceChildren(el("h3", "", "Changes in this chat"));
     if (!data.changes.length)
       root.append(
-        el(
-          "p",
-          "service-detail",
-          "هنوز تغییری با ابزار ویرایش کد ثبت نشده است.",
-        ),
+        el("p", "service-detail", "No managed code changes in this chat yet."),
       );
     for (const change of data.changes) {
       const detail = el("details");
       detail.append(
         el("summary", "coding-path", change.path),
-        el("pre", "coding-output", change.diff || "تغییری در محتوا نیست."),
+        el("pre", "coding-output", change.diff || "No content changes."),
       );
       if (change.truncated)
         detail.append(
           el(
             "p",
             "service-detail",
-            "نمایش تغییرات کوتاه شده است. فایل اصلی را در پروژه بررسی کن.",
+            "This diff is truncated. Review the full file in the project.",
           ),
         );
       root.append(detail);
@@ -244,12 +240,12 @@ export function mountCoding({
           el(
             "p",
             "coding-access-notice",
-            "برای ادامهٔ کدنویسی، پوشه و دسترسی از این کارت مدیریت می‌شود؛ تأیید با توست.",
+            "Review workspace access here to continue coding. Approval is always yours.",
           ),
         );
         body.append(
           button(
-            "انتخاب پوشه و اجازهٔ کدنویسی",
+            "Choose folder & approve access",
             () => openAccess(message.access_request),
             "message-build-card",
           ),
@@ -258,7 +254,7 @@ export function mountCoding({
       if (message.project_id)
         body.append(
           button(
-            "مشاهدهٔ پروژه، تست‌ها و تغییرات",
+            "View project, tests & changes",
             () => openProjects(message.project_id),
             "message-build-card",
           ),

@@ -341,7 +341,7 @@ class ChatService:
         paths = [
             r["path"] for r in sorted(records, key=lambda r: r["updated_at"], reverse=True)[:8]
         ]
-        summary = "\n\nفایل‌های نوشته یا ویرایش‌شده در این نوبت:\n" + "\n".join(
+        summary = "\n\nFiles written or edited in this turn:\n" + "\n".join(
             "- `" + path + "`" for path in paths
         )
         runs = [
@@ -351,13 +351,13 @@ class ChatService:
         ]
         if runs:
             run = runs[0]
-            summary += "\nآخرین تست: " + (
-                f"{run.get('tests_run', 0)} تست پاس شد."
+            summary += "\nLatest test: " + (
+                f"{run.get('tests_run', 0)} tests passed."
                 if run["status"] == "passed"
-                else "هنوز موفق نشده است."
+                else "Not yet passing."
             )
         else:
-            summary += "\nقبولی تست برای این تغییرات تأیید نشده است."
+            summary += "\nPassing tests have not been confirmed for these changes."
         return self.tools.store.redact(summary)
 
     async def run(self, chat_id: str, assistant_id: str, emit: Callable[[dict], None]) -> None:
@@ -394,15 +394,15 @@ class ChatService:
                     chat_id,
                     AccessRequest(
                         mode="system",
-                        reason="ساخت یا ویرایش کد و بررسی تست‌های درخواست تو در پوشهٔ انتخابی",
+                        reason="Create or edit code and run checks in your chosen folder",
                     ),
                 )
                 pending_access = result["access_request"]
                 message = self.history.finish_turn(
                     chat_id,
                     assistant_id,
-                    "برای کدنویسی روی سیستم، ابتدا پوشه و سطح دسترسی را بررسی و اجازه بده. "
-                    "با «اجازه و ادامه»، همین درخواست را اجرا می‌کنم.",
+                    "Review and approve the folder and scope before local coding. "
+                    "Select Approve & continue to resume this request.",
                     access_request=pending_access,
                     project_id=project_id,
                 )
@@ -467,7 +467,9 @@ class ChatService:
                         force_tool = True
                         continue
                     if review.status == "blocked":
-                        decision.message = "کار هنوز کامل نشده است. " + "؛ ".join(review.missing)
+                        decision.message = "The task is not complete yet. " + "; ".join(
+                            review.missing
+                        )
                 if decision.action != "tool":
                     break
                 if not self.tools:
@@ -548,8 +550,8 @@ class ChatService:
                         decision = ChatDecision(
                             action="reply",
                             message=(
-                                "برای ادامهٔ کار، اجازهٔ دسترسی لازم است. پوشه و سطح دسترسی را "
-                                "در کارت درخواست بررسی کن و «اجازه و ادامه» را بزن."
+                                "Access approval is required. Review the folder and scope "
+                                "in the access request and select Approve & continue."
                             ),
                         )
                         emit({"type": "permission_required", "access_request": pending_access})
@@ -576,15 +578,15 @@ class ChatService:
                         chat_id,
                         AccessRequest(
                             mode=exc.scope,
-                            reason="ادامهٔ درخواست تو با ابزار " + str(decision.tool_name),
+                            reason="Continue your request using " + str(decision.tool_name),
                         ),
                     )
                     pending_access = result["access_request"]
                     decision = ChatDecision(
                         action="reply",
                         message=(
-                            "برای کار روی سیستم، اجازهٔ دسترسی لازم است. پوشه و سطح دسترسی را "
-                            "بررسی کن و از کارت درخواست، اجازه بده تا کار ادامه پیدا کند."
+                            "Local access approval is required. Review the folder and scope "
+                            "in the access request to continue."
                         ),
                     )
                     emit({"type": "permission_required", "access_request": pending_access})
@@ -619,9 +621,9 @@ class ChatService:
                         decision = ChatDecision(
                             action="reply",
                             message=(
-                                "نتیجهٔ درخواست به سرویس نامشخص است؛ ممکن است عملیات انجام "
-                                "شده باشد. آن را خودکار تکرار نکردم. ابتدا وضعیت را در "
-                                "سرویس مقصد بررسی کن و سپس برای ادامه تصمیم بگیر."
+                                "The request has an uncertain outcome; the operation may have "
+                                "succeeded. No automatic retry was made. Check the state in the "
+                                "destination service before deciding how to continue."
                             ),
                         )
                         break
@@ -634,13 +636,13 @@ class ChatService:
             if tool_build:
                 build = tool_build
                 content = (
-                    f"Workflow «{build['ir']['name']}» آمادهٔ بررسی است. "
+                    f"Workflow '{build['ir']['name']}' is ready for review. "
                     + {
-                        "draft": "وضعیت: پیش‌نویس محلی. ",
-                        "deployed": "در n8n ساخته شد و غیرفعال است. ",
-                        "active": "این Workflow از قبل در n8n فعال است. ",
+                        "draft": "Status: local draft. ",
+                        "deployed": "Created in n8n and inactive. ",
+                        "active": "This workflow is already active in n8n. ",
                     }.get(build["status"], "")
-                    + "جزئیات را در پنل Workflow ببین؛ فعال‌سازی با تأیید توست."
+                    + "Review the workflow panel. Activation requires your approval."
                 )
             elif decision.action == "build":
                 context = json.dumps(
@@ -682,10 +684,11 @@ class ChatService:
                     warnings=state["warnings"],
                 )
                 content = (
-                    f"طرح «{build['ir']['name']}» آماده است؛ با {len(build['ir']['nodes'])} گره. "
-                    "می‌توانی طرح را در پنل Workflow بررسی کنی، "
-                    "تغییر بخواهی یا آن را به n8n بفرستی. "
-                    "فعال‌سازی به تأیید جداگانهٔ تو نیاز دارد."
+                    f"Workflow '{build['ir']['name']}' is ready "
+                    f"with {len(build['ir']['nodes'])} nodes. "
+                    "Review it in the workflow panel, "
+                    "request changes, or deploy it to n8n. "
+                    "Activation requires separate approval."
                 )
             else:
                 content = decision.message
@@ -710,7 +713,7 @@ class ChatService:
             message = self.history.finish_turn(
                 chat_id,
                 assistant_id,
-                "پردازش هنگام توقف برنامه قطع شد؛ درخواستت را دوباره بفرست.",
+                "Processing was interrupted. Send your request again to continue.",
                 error_code="interrupted",
             )
             emit({"type": "failed", "message": message})
@@ -718,29 +721,30 @@ class ChatService:
         except (IntegrationError, PlanningFailed) as exc:
             code = exc.code if isinstance(exc, IntegrationError) else "planning_failed"
             content = (
-                "مدل محلی در دسترس نیست یا پاسخ معتبر نداد. اتصال Ollama و نام مدل را "
-                "در بخش تنظیمات بررسی کن و دوباره تلاش کن."
+                "The model is unavailable or returned invalid output. "
+                "Check the Ollama connection and model name "
+                "in Settings and try again."
             )
             if isinstance(exc, PlanningFailed):
                 errors = {item.get("code") for item in exc.errors}
                 if "tool_loop" in errors:
                     tool = next(item["tool"] for item in exc.errors if item["code"] == "tool_loop")
                     content = (
-                        f"طراحی هنوز کامل نشده است: مدل ابزار «{tool}» را با همان ورودی "
-                        "تکرار می‌کرد. تکرار را متوقف کردم و درخواست خواندن تکراری اجرا نشد. "
-                        "اتصال‌ها و اطلاعات لازم برای گام بعد را بررسی کن."
+                        f"The task is incomplete: the model repeated '{tool}' with the same input. "
+                        "The repeated read was stopped and was not executed again. "
+                        "Check the connections and information required for the next step."
                     )
                 elif "step_budget" in errors:
                     content = (
-                        "کار در تعداد مراحل مجاز کامل نشد. نتیجهٔ ابزارها را در گزارش "
-                        "فعالیت بررسی کن؛ می‌توانی درخواست را به چند کار کوچک‌تر تقسیم کنی."
+                        "The task reached its step limit. Review tool results in the "
+                        "activity log, then continue with a more focused request."
                     )
                 elif errors & {"chat_schema", "completion_schema"}:
-                    content = "مدل پاسخ معتبر برای ادامه یا بررسی نتیجه نداد؛ کار کامل اعلام نشد."
+                    content = "Invalid model decision or review. The task was not marked complete."
                 else:
                     content = (
-                        "طرحی که اعتبارسنجی را بگذراند ساخته نشد. درخواستت را کمی ساده‌تر و "
-                        "دقیق‌تر بگو؛ مثلاً ورودی، کار اصلی و خروجی را مشخص کن."
+                        "No plan passed validation. Describe the request more clearly, "
+                        "including the input, task, and expected output."
                     )
             if coding:
                 content += self.coding_progress(chat_id, turn_started)
@@ -751,7 +755,7 @@ class ChatService:
             message = self.history.finish_turn(
                 chat_id,
                 assistant_id,
-                "پردازش کامل نشد. لطفاً دوباره تلاش کن.",
+                "Processing failed. Please try again.",
                 error_code="internal_error",
             )
             emit({"type": "failed", "message": message})

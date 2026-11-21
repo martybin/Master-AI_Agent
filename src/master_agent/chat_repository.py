@@ -33,8 +33,8 @@ class ChatRepository:
                                 status="failed",
                                 error_code="interrupted",
                                 content=(
-                                    "برنامه هنگام پردازش دوباره اجرا شد. "
-                                    "لطفاً درخواستت را دوباره بفرست."
+                                    "The application restarted while processing this request. "
+                                    "Please send your request again."
                                 ),
                             )
                             db.execute(
@@ -42,10 +42,17 @@ class ChatRepository:
                                 (json.dumps(message), message_id),
                             )
 
+    @staticmethod
+    def present(record):
+        record.setdefault("pinned", False)
+        if record["title"] == "گفتگوی تازه":
+            record["title"] = "New chat"
+        return record
+
     def create(self, target="auto") -> dict:
         record = {
             "id": str(uuid4()),
-            "title": "گفتگوی تازه",
+            "title": "New chat",
             "status": "idle",
             "target": target,
             "pinned": False,
@@ -78,7 +85,7 @@ class ChatRepository:
                 "COALESCE(json_extract(data,'$.pinned'),0) DESC, "
                 "json_extract(data,'$.updated_at') DESC, id"
             ).fetchall()
-        return [{"pinned": False, **json.loads(row[0])} for row in rows]
+        return [self.present(json.loads(row[0])) for row in rows]
 
     def get(self, chat_id: str) -> dict:
         with self.builds.connect() as db:
@@ -90,8 +97,7 @@ class ChatRepository:
                 (chat_id,),
             ).fetchall()
         return {
-            "pinned": False,
-            **json.loads(row[0]),
+            **self.present(json.loads(row[0])),
             "messages": [json.loads(row[0]) for row in messages],
         }
 
@@ -105,7 +111,7 @@ class ChatRepository:
             # Pinning must not change conversation recency.
             chat["pinned"] = pinned
             db.execute("UPDATE chats SET data=? WHERE id=?", (json.dumps(chat), chat_id))
-        return chat
+        return self.present(chat)
 
     def delete(self, chat_id: str) -> None:
         with self.builds.connect() as db:
@@ -173,7 +179,7 @@ class ChatRepository:
                     "INSERT INTO chat_messages(id,chat_id,request_id,role,data) VALUES(?,?,?,?,?)",
                     (message["id"], chat_id, request_id, message["role"], json.dumps(message)),
                 )
-            if chat["title"] == "گفتگوی تازه":
+            if chat["title"] in {"New chat", "گفتگوی تازه"}:
                 chat["title"] = content[:48]
             chat.update(status="busy", updated_at=now())
             db.execute("UPDATE chats SET data=? WHERE id=?", (json.dumps(chat), chat_id))

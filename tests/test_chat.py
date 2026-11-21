@@ -41,7 +41,7 @@ def send(api, chat_id, content="یک دستیار محلی با Webhook بساز
 def test_ui_is_public_but_never_embeds_keys(api, settings, network):
     page = api.get("/", headers={"Authorization": ""})
     assert page.status_code == 200
-    assert "ایده‌ات را بگو" in page.text
+    assert "Describe your idea" in page.text
     assert settings.master_api_key.get_secret_value() not in page.text
     assert "script-src" in page.headers["content-security-policy"]
     for path in [
@@ -52,6 +52,9 @@ def test_ui_is_public_but_never_embeds_keys(api, settings, network):
     ]:
         response = api.get(path)
         assert response.status_code == 200
+        assert response.headers["cache-control"] == "no-cache"
+        cached = api.get(path, headers={"If-None-Match": response.headers["etag"]})
+        assert cached.status_code == 304 and cached.headers["cache-control"] == "no-cache"
         assert settings.master_api_key.get_secret_value().encode() not in response.content
     assert api.get("/assets/../config.py").status_code == 404
     assert not network.calls
@@ -326,3 +329,41 @@ def test_legacy_chat_without_pin_is_readable_and_pinnable(settings):
     assert history.get(chat["id"])["pinned"] is False
     history.set_pinned(chat["id"], True)
     assert history.get(chat["id"])["pinned"] is True
+
+
+def test_english_interface_preserves_persian_conversation_and_model_prompt(api, network):
+    page = api.get("/").text
+    assert '<html lang="en" dir="ltr">' in page
+    assert 'dir="auto"' in page
+    network.chat_outputs = [json.dumps({"action": "reply", "message": "سلام! آماده‌ام کمکت کنم."})]
+    cid = new_chat(api)
+    assert api.get(f"/api/v1/chats/{cid}").json()["title"] == "New chat"
+    complete = next(
+        e for e in events(send(api, cid, "سلام، فارسی صحبت می‌کنی؟")) if e["type"] == "complete"
+    )
+    assert complete["message"]["content"] == "سلام! آماده‌ام کمکت کنم."
+    record = api.get(f"/api/v1/chats/{cid}").json()
+    assert record["messages"][0]["content"] == "سلام، فارسی صحبت می‌کنی؟"
+    assert record["title"].startswith("سلام")
+    call = next(c for c in network.calls if c.url.path == "/api/chat")
+    prompt = json.loads(call.content)["messages"][0]["content"]
+    assert "Persian-speaking" in prompt and "in Persian" in prompt
+
+
+def test_legacy_empty_chat_title_is_presented_in_english_without_rewriting_history(api):
+    cid = new_chat(api)
+    history = api.app.state.history
+    with history.builds.connect() as db:
+        db.execute(
+            "UPDATE chats SET data=json_set(data,'$.title',?) WHERE id=?", ("گفتگوی تازه", cid)
+        )
+    assert api.get(f"/api/v1/chats/{cid}").json()["title"] == "New chat"
+    assert (
+        next(c for c in api.get("/api/v1/chats").json()["chats"] if c["id"] == cid)["title"]
+        == "New chat"
+    )
+    with history.builds.connect() as db:
+        raw = json.loads(db.execute("SELECT data FROM chats WHERE id=?", (cid,)).fetchone()[0])
+        assert raw["title"] == "گفتگوی تازه"
+    history.start_turn(cid, str(uuid4()), "یک درخواست فارسی واقعی")
+    assert history.get(cid)["title"] == "یک درخواست فارسی واقعی"

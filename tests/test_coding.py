@@ -699,5 +699,5 @@ def test_interrupted_coding_plan_reports_real_partial_files(api, tmp_path, monke
     monkeypatch.setattr(api.app.state.chat_service, "decide", decide)
     result = next(e["message"] for e in send(api, cid, "کد بنویس") if e["type"] == "failed")
     assert result["error_code"] == "planning_failed"
-    assert "partial.py" in result["content"] and "تأیید نشده" in result["content"]
+    assert "partial.py" in result["content"] and "not been confirmed" in result["content"]
     assert (tmp_path / "partial.py").exists()
