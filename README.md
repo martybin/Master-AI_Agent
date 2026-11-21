@@ -2,14 +2,14 @@
 
 **Build n8n automations and Python agents with a local AI, through conversation.**
 
-BisCode is a local agent builder with an English chat interface and support for
-Persian conversations. It turns requests into reviewable n8n workflows, and can
+BisCode is a local agent builder with a bilingual English/Persian chat interface
+and support for Persian conversations. It turns requests into reviewable n8n workflows, and can
 create, edit, and test Python code with access you approve for each chat.
 
 The primary workflow is **describe → build → inspect → deploy inactive → approve activation**.
 Ollama runs the model on your machine; no paid model API key is required.
 
-![BisCode workspace](docs/images/biscode-workspace.png)
+![BisCode workspace with Persian interface selected](docs/images/biscode-workspace-bilingual.jpg)
 
 [Quick start](#quick-start) · [Connect n8n](#connect-n8n) ·
 [Local coding](#local-coding) · [Configuration](#configuration) ·
@@ -32,8 +32,9 @@ Ollama runs the model on your machine; no paid model API key is required.
 
 The workspace includes persistent chat history, search, pinning, chat deletion,
 workflow inspection, access approval, connection management, and execution logs.
-The interface is English; **the model's Persian instructions and multilingual
-input support are preserved**. Persian messages retain their natural text direction.
+Switch the interface between English and Persian from the top bar; the choice is
+saved in this browser, with RTL layout for Persian. **The model's Persian
+instructions and multilingual input support are preserved**. Persian messages retain their natural text direction.
 
 ## Quick start
 
@@ -140,7 +141,9 @@ requests in Auto mode; explicit Python and coding requests can use the coding pa
 
 Before using local files, BisCode opens an access request:
 
-1. Choose an existing workspace folder.
+1. Select **Browse** to open the system folder chooser. You can also navigate folders
+   and create a **New folder** in the in-app chooser, then select **Use this folder**.
+   The project can live anywhere your OS user can access, including outside BisCode.
 2. Review the scope: workspace files, or files and system commands.
 3. Confirm and select **Approve & continue** to resume the saved request.
 

@@ -40,7 +40,11 @@ escapes. `system` adds commands and broader filesystem reach with the current
 OS user's permissions. The selected workspace is the working directory, not an
 OS isolation boundary. Permission is per chat; changing one chat's directory
 does not mutate the global workspace or another chat's grant. The selected
-folder must already exist. Grants can be revoked even after a folder disappears.
+folder must exist when access is granted. Use **Browse** to choose an existing
+folder anywhere your OS user can access, or **New folder** in the picker to
+create one before approving. The native picker uses Zenity directory mode when
+available; the in-app browser works without it. Browsing/selection never grants
+access automatically. Grants can be revoked even after a folder disappears.
 
 The model cannot approve requests through a published tool. This is a local,
 single-owner application: the owner bearer key is administrative, and arbitrary
@@ -178,7 +182,19 @@ and available test status.
 
 ## Interface language and Persian support
 
-The interface and system notices are English. Persian conversation text, model
+The interface can be switched between English and Persian in the top bar.
+Persian conversation text, model
 instructions, request detection, and UTF-8 input remain supported. Message bodies
 and the composer use automatic text direction, while code blocks stay LTR.
 Changing the interface language does not replace the model or rewrite saved chats.
+
+Owner-only folder endpoints (not available as model tools):
+
+- `GET /api/v1/local/browse?path=...&hidden=false`: bounded child directory listing;
+  omitted path opens the host user's home. Returned entries contain absolute paths.
+- `POST /api/v1/local/pick-folder?path=...`: native directory chooser, returning
+  `path` on selection, `cancelled:true` on cancel, or `available:false` for fallback.
+- `POST /api/v1/local/folders`: `{parent, name}` creates one new directory under
+  an existing parent. Rejects path separators, traversal, and existing names.
+
+All require the owner key. They do not modify chat grants or approve requests.

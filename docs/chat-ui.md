@@ -1,6 +1,6 @@
 # BisCode chat workspace
 
-The English interface is served by the same FastAPI process as the API, at
+The bilingual English/Persian interface is served by the same FastAPI process as the API, at
 `http://127.0.0.1:8000/` by default. It uses bundled HTML, CSS, JavaScript, icons,
 and fonts. No separate frontend service, Node.js runtime, or online font download
 is required.
@@ -128,3 +128,21 @@ The regression tests cover conversation persistence, replay, interrupted turns,
 permission approval, pins, deletion, activation guards, safe rendering contracts,
 and Persian UTF-8 event parsing. Live model smoke tests are opt-in and do not
 establish that a generated workflow runs successfully in n8n.
+
+## Language and project folders
+
+Use the language selector in the top bar to switch instantly between **English**
+and **فارسی**. This browser remembers the choice across reloads. Persian uses an
+RTL shell; chat text follows its own direction, while code and paths remain LTR.
+Switching language does not change the model, prompts, saved chat content, or
+permission checkboxes. Unknown backend/plugin error details remain verbatim.
+
+In the local access dialog or Local Agent → Access, select **Browse**. On the
+host desktop, BisCode opens Zenity's native directory chooser when available;
+without a usable desktop chooser, the in-app directory browser remains available.
+Use **Home**, **Up**, **Show hidden folders**, and **New folder** to reach or create
+a project folder without typing its absolute path. Select **Use this folder**,
+then review and explicitly approve access. Browsing and selecting a folder do
+not grant model permissions. Creating a folder creates only that empty directory.
+The picker browses the machine running the backend, so run BisCode on the same
+computer where you want to code. Each chat can use a different folder.
