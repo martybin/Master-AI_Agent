@@ -1,119 +1,122 @@
-# رابط گفتگو با BisCode
+# BisCode chat workspace
 
-انتخاب‌گر «روش ساخت» بین پیش‌فرض n8n، Python و کدنویسی روی پروژه جابه‌جا می‌شود.
-برای کار محلی، کارت دسترسی با پوشه و سطح مجوز نمایش داده می‌شود؛ «اجازه و ادامه»
-پس از تأیید، همان درخواست را ادامه می‌دهد. بخش «پروژه‌ها و کدنویسی» فایل‌ها، تغییرات،
-ZIP و خروجی واقعی تست‌ها را نشان می‌دهد. [راهنمای کدنویسی](coding.md)
+The English interface is served by the same FastAPI process as the API, at
+`http://127.0.0.1:8000/` by default. It uses bundled HTML, CSS, JavaScript, icons,
+and fonts. No separate frontend service, Node.js runtime, or online font download
+is required.
 
-UI با اجرای همان FastAPI در آدرس `http://127.0.0.1:8000/` باز می‌شود.
-برای استفاده به Node، npm، سرویس frontend جدا یا دانلود فونت در زمان اجرا نیاز ندارد.
-فایل‌ها، آیکن‌ها و فونت Vazirmatn همراه خود بستهٔ پایتون ارائه می‌شوند.
+Persian input and model instructions are preserved. The interface is LTR, while
+message text and the composer choose their direction automatically. Persian
+numbered lists remain supported by the Markdown renderer, and code blocks remain LTR.
 
-## شروع
+## Connect and start a conversation
 
 ```bash
 make run
 ```
 
-1. آدرس بالا را باز کن و روی «اتصال به فضای کاری» بزن.
-2. مقدار `MASTER_API_KEY` از `.env` را وارد کن. این کلید با `N8N_API_KEY` فرق دارد.
-3. در حالت پیش‌فرض کلید فقط در حافظهٔ صفحه می‌ماند. گزینهٔ نگه‌داشتن اتصال، آن را
-   تا بسته‌شدن همان تب در `sessionStorage` ذخیره می‌کند. کلید در URL یا HTML صفحه نیست.
-4. درخواستت را بنویس یا از کارت‌های پیشنهادی کمک بگیر. `Enter` پیام را می‌فرستد؛
-   `Shift+Enter` خط جدید می‌سازد. `Ctrl/Cmd+K` گفتگوی تازه باز می‌کند.
+1. Open the workspace and select **Connect workspace**.
+2. Enter `MASTER_API_KEY` from `.env`. This is different from `N8N_API_KEY`.
+3. By default, the key stays in page memory. **Keep me connected until this tab
+   closes** stores it in that tab's `sessionStorage`. It is not embedded in the
+   page, URL, or `localStorage`.
+4. Choose a build method, describe the task in English or Persian, and send it.
+   Enter sends a message; Shift+Enter inserts a newline. Ctrl/Cmd+K starts a new chat.
 
-مثال:
+The model keeps its Persian-speaking instructions; translating the interface
+does not switch the configured model or remove Persian capability.
 
-> یک دستیار فارسی بساز که از Webhook POST پیام body.message را بگیرد، با Ollama
-> پاسخ بدهد و نتیجه را به شکل JSON برگرداند.
+## Build methods
 
-بعد از ساخت، در همان گفتگو می‌توانی بگویی:
+- **Auto:** n8n is the default; explicit Python/coding requests can use local coding.
+- **n8n workflow:** generate and refine an n8n workflow.
+- **Python agent:** create and customize a Python agent project.
+- **Local coding:** work on scripts, libraries, or an existing codebase.
 
-> جواب‌ها را کوتاه‌تر کن و اسمش را «دستیار من» بگذار.
+Change the build method while the chat is idle. Local coding requests open an
+access dialog before using the filesystem. Choose the folder and scope, confirm,
+and select **Approve & continue**. See [the coding contract](coding.md).
 
-درخواست دوم، با توجه به پیام‌های اخیر و IR آخرین ساخت همان گفتگو، یک پیش‌نویس
-جدید می‌سازد. ساخت قبلی برای بازبینی حفظ می‌شود و Workflow موجود در n8n بازنویسی نمی‌شود.
+## Workflows and activation
 
-## رفتار رابط
+The workflow inspector shows real nodes, connections, and compiled JSON. **My
+workflows** lists both API-created and chat-created builds. You can download a
+workflow JSON artifact for manual import without activating it.
 
-- گفتگوهای عادی و سؤال‌های روشن‌سازی پاسخ متنی می‌گیرند و Workflow ایجاد نمی‌کنند.
-- درخواست ساده از گراف تولید → اعتبارسنجی → کامپایل عبور می‌کند؛ درخواست پیشرفته از ابزارها و کاتالوگ گره‌ها استفاده می‌کند.
-- نشانگر مراحل، رویدادهای واقعی سرور را نمایش می‌دهد؛ درصد یا پیشرفت ساختگی ندارد.
-- پنل Workflow گره‌ها، شاخه‌ها و JSON کامپایل‌شده را از خروجی واقعی سرور نمایش می‌دهد.
-- «Workflowهای من» ساخت‌های API و ساخت‌های گفتگو را کنار هم فهرست می‌کند.
-- خروجی JSON را می‌توان برای Import دستی دریافت کرد؛ این کار فعال‌سازی نمی‌کند.
-- پاسخ‌ها با یک نمایشگر محدود متن، فهرست، bold و code رندر می‌شوند. HTML مدل اجرا نمی‌شود.
+After n8n is configured, **Deploy to n8n** creates an inactive workflow. **Review &
+activate** opens a separate dialog showing the exact version and request
+destinations. The owner must select the approval checkbox and press **Approve &
+activate**. The server rechecks fingerprints and the n8n version.
 
-## ارسال و فعال‌سازی
+An uncertain deployment result offers reconciliation rather than automatic
+redeployment. Reconciliation reads the remote state. A chat message asking for
+activation does not expose an activation tool to the model.
 
-«ارسال به n8n» پس از اتصال موفق n8n در دسترس است و Workflow را **غیرفعال** می‌سازد.
-اتصال از همان `N8N_BASE_URL` و `N8N_API_KEY` در `.env` خوانده می‌شود؛ پس از تغییر
-این فایل، سرور را دوباره اجرا کن. وضعیت Ollama و n8n در بخش تنظیمات مستقل نمایش داده می‌شود.
+**Projects & code** shows Python agent project files, actual test output, managed
+diffs, and authenticated ZIP downloads. Project creation does not start its service.
 
-برای فعال‌سازی، روی «بازبینی و فعال‌سازی» بزن. نام، مقصد درخواست‌ها، نسخه و JSON
-دقیق نمایش داده می‌شوند. باید گزینهٔ تأیید را انتخاب کنی و سپس «تأیید و فعال‌سازی»
-را بزنی. سرور همان محافظ‌های اثر انگشت و نسخه را دوباره اعمال می‌کند.
-فرستادن جملهٔ «فعال کن» به چت، دسترسی فعال‌سازی به مدل نمی‌دهد.
+## History and persistence
 
-در وضعیت نتیجهٔ نامشخص، UI دکمهٔ ارسال مجدد خودکار ندارد؛ «تطبیق وضعیت» از همان
-مسیر read-only reconciliation موجود استفاده می‌کند. این مرحله صرفاً وضعیت واقعی را می‌خواند.
+Chats and messages are stored in SQLite, independently of the browser session.
+Refreshing the page, closing a tab, or restarting the application does not delete
+them. Reconnect to the same workspace and database to see the saved history.
 
-## ذخیره‌سازی و قطع ارتباط
+- Pin and unpin chats with the pin icon. Pins persist on the server and appear first.
+- Search includes pinned and unpinned chats.
+- The trash icon opens a confirmation dialog. Deleting a chat removes its messages,
+  local grant, pending access requests, and revision handles. Existing projects,
+  files, workflow builds, and execution records are retained.
+- A busy chat must be stopped before deletion.
 
-گفتگوها و پیام‌ها در جدول‌های `chats` و `chat_messages` در SQLite موجود ذخیره می‌شوند.
-تازه‌کردن صفحه، بستن تب و راه‌اندازی مجدد برنامه آن‌ها را پاک نمی‌کند؛ برای دیدن
-تاریخچه باید دوباره به همان فضای کاری و دیتابیس متصل شوی. کلید دسترسی همچنان فقط
-طبق گزینهٔ اتصال در حافظه یا sessionStorage همان تب نگه داشته می‌شود. شناسهٔ آخرین
-گفتگوی باز در localStorage می‌ماند تا پس از ورود دوباره بازیابی شود؛ متن پیام‌ها
-و کلید دسترسی در localStorage ذخیره نمی‌شوند. اگر گفتگو دیگر وجود نداشت، اولین
-گفتگوی فهرست باز می‌شود.
+The last selected chat ID is saved in `localStorage`; message text and owner keys
+are not. After reconnecting, the interface restores that chat if it exists, or
+opens the first chat in the list. Legacy empty-chat titles are presented as
+**New chat** without rewriting stored user content.
 
-کنار هر گفتگو آیکون پین و سطل زباله وجود دارد. پین‌ها در SQLite ذخیره می‌شوند و
-با تغییر عنوان، پیام جدید یا restart باقی می‌مانند. پین‌کردن زمان آخرین پیام را
-تغییر نمی‌دهد. جستجو هر دو بخش پین‌شده و گفتگوهای قبلی را بررسی می‌کند.
-حذف نیاز به تأیید در پنجرهٔ رابط دارد و برگشت‌پذیر نیست؛ گفتگو و پیام‌هایش و
-درخواست‌های دسترسی و مجوز محلی همان چت حذف می‌شوند. پروژه‌ها، فایل‌ها، ساخت‌های
-Workflow و گزارش‌های اجرا باقی می‌مانند. برای حذف چت مشغول ابتدا «توقف کار» را بزن.
-این نسخه محدودیت نمایش ۱۰۰ گفتگو و ۱۰۰ پیام را برداشته است؛ تاریخچه‌های خیلی
-بزرگ ممکن است زمان بارگذاری بیشتری داشته باشند. زمینهٔ مدل همچنان محدود می‌ماند.
-هر نوبت پیام یک `request_id` یکتا دارد؛ ارسال دوبارهٔ همان شناسه و همان متن، نتیجهٔ
-قبلی را برمی‌گرداند و مدل را دوباره فراخوانی نمی‌کند. استفادهٔ دوبارهٔ شناسه با متن
-متفاوت، خطای 409 می‌دهد.
+The API currently returns all saved chats and messages. Large histories may take
+longer to load. Model context remains separately bounded to recent content.
 
-پردازش پیام پس از بسته‌شدن اتصال HTTP در سرور ادامه می‌یابد و نتیجه ذخیره می‌شود.
-اگر صفحه را تازه کنی، ورود دوباره و انتخاب گفتگو نتیجه را بازیابی می‌کند. اگر
-خود برنامه هنگام پردازش متوقف شود، پیام ناتمام به حالت شکست‌خورده تغییر می‌کند.
+## Streaming, recovery, and cancellation
 
-قفل مدل میان مسیر قدیمی `/builds` و گفتگو مشترک است. فقط یک درخواست inference
-هم‌زمان اجرا می‌شود. مانند نسخهٔ قبلی، یک worker و یک process برای هر دیتابیس اجرا کن.
+Stage events represent real server activity. Coding steps show the current tool
+and step number; elapsed time is measured locally. No synthetic percentage is shown.
+The UI also checks durable message state to recover a final response if the SSE
+connection misses a completion event.
 
-Master اکنون ابزارهای محلی و اتصال‌ها را از پنل Local Agent در اختیار دارد.
-قالب سادهٔ خروجی بدون حافظه است؛ قابلیت‌های طرح پیشرفته به گره‌های نصب‌شده در n8n
-وابسته است. تاریخچهٔ سازنده به‌تنهایی حافظهٔ اجرایی ایجنت خروجی نمی‌شود.
-[راهنمای Local Agent](local-agent.md) مراحل ورود تلگرام و دسترسی سیستم را توضیح می‌دهد.
-دکمهٔ «توقف کار» پردازش جاری را لغو می‌کند؛ بستن تب کار را لغو نمی‌کند.
+Closing the browser connection does not cancel the backend task. Reopen the chat
+to see its result. **Stop** cancels the task and its current local subprocess.
+Stopping cannot undo operations that have already completed.
 
-## مسیرهای جدید
+If the application restarts during a task, its pending assistant message is marked
+interrupted. Requests have idempotency IDs: replaying the same ID and content
+returns the saved turn, while reusing the ID for different content returns 409.
 
-همهٔ مسیرهای زیر همچنان به Bearer key مالک نیاز دارند:
+The direct-build and chat paths share an inference lock. Run one process and one
+worker for each database.
 
-- `GET /api/v1/ui/config`: مدل، آدرس ویرایشگر n8n و میزبان‌های HTTP مجاز، بدون کلیدها.
-- `GET /api/v1/chats`: همهٔ گفتگوهای ذخیره‌شده؛ پین‌شده‌ها ابتدا و سپس جدیدترین‌ها.
-- `POST /api/v1/chats`: ساخت گفتگو.
-- `GET /api/v1/chats/{id}`: همهٔ پیام‌های ذخیره‌شده، به ترتیب ارسال.
-- `PUT /api/v1/chats/{id}/pin`: بدنهٔ `{ "pinned": true }` یا `false` برای پین و برداشتن پین.
-- `DELETE /api/v1/chats/{id}`: حذف چت و پیام‌ها و لغو دسترسی محلی همان چت؛ چت مشغول خطای 409 می‌دهد.
-- `POST /api/v1/chats/{id}/messages`: بدنهٔ `content` و `request_id` از نوع UUID؛
-  خروجی SSE شامل `started`, `stage`, `complete` یا `failed` و `done` است.
-  replay درخواست قبلی یک پاسخ JSON دارد.
-- `POST /api/v1/chats/{id}/cancel`: توقف پردازش جاری و فرایند فرمان محلی آن.
-- `GET /api/v1/builds`: خلاصهٔ حداکثر ۱۰۰ ساخت اخیر.
+## Owner API endpoints
 
-زمینهٔ مدل به پیام‌های اخیر محدود است و آخرین IR همان گفتگو برای اصلاح به planner
-داده می‌شود. طرح‌های بسیار بزرگ ممکن است نیاز به شروع گفتگوی تازه داشته باشند.
-احراز هویت همچنان مدل تک‌مالک محلی است؛ UI حساب کاربری یا مجوز چندکاربره ایجاد نمی‌کند.
+All these routes require the owner's Bearer key:
 
-## بررسی
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /api/v1/ui/config` | Model name, n8n editor address, allowed hosts, and version; no secrets |
+| `GET /api/v1/chats` | Saved chats, pinned first and then ordered by recency |
+| `POST /api/v1/chats` | Create a chat with an optional `target` |
+| `GET /api/v1/chats/{id}` | Saved messages in send order |
+| `PUT /api/v1/chats/{id}/target` | Change the build method while idle |
+| `PUT /api/v1/chats/{id}/pin` | Set a strict boolean `pinned` value |
+| `DELETE /api/v1/chats/{id}` | Delete an idle chat and revoke its local access |
+| `POST /api/v1/chats/{id}/messages` | Send `content` and a UUID `request_id`; returns SSE or a saved replay |
+| `POST /api/v1/chats/{id}/resume` | Resume a saved, owner-approved access request |
+| `POST /api/v1/chats/{id}/cancel` | Stop the current task |
+| `GET /api/v1/builds` | Recent workflow build summaries |
+
+Messages are rendered as text and a limited Markdown subset. User/model HTML is
+not executed. The workspace uses a single-owner authentication model, not a
+multi-user account system.
+
+## Verification
 
 ```bash
 make test
@@ -121,10 +124,7 @@ make test-ui
 make check
 ```
 
-تست‌ها مسیرهای reply/build، زمینهٔ اصلاح، ذخیرهٔ تاریخچه، replay پیام، شکست مدل،
-بازیابی بعد از restart، قفل مشترک، حفاظت کلید، دسترسی assetها و پارس SSE با مرزهای
-UTF-8 را بررسی می‌کنند. تست JavaScript فقط به Node 22 یا جدیدتر نیاز دارد؛ اجرای
-روزمرهٔ UI به Node نیاز ندارد.
-
-رابط با مدل واقعی محلی و در اندازه‌های دسکتاپ و موبایل بررسی می‌شود. ارسال و
-فعال‌سازی واقعی n8n تا زمان نصب Docker و تنظیم API key آن، قابل بررسی زنده نیست.
+The regression tests cover conversation persistence, replay, interrupted turns,
+permission approval, pins, deletion, activation guards, safe rendering contracts,
+and Persian UTF-8 event parsing. Live model smoke tests are opt-in and do not
+establish that a generated workflow runs successfully in n8n.

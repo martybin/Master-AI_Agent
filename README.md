@@ -1,290 +1,293 @@
-# BisCode — ساخت ایجنت با n8n و Python · 0.4
+# BisCode
 
-ساخت و مدیریت اتوماسیون n8n با ابزارهای سیستم، Python، FastAPI، LangGraph و مدل محلی
-`qwen3.5:9b` در Ollama؛ بدون نیاز به API پولی GPT یا Claude.
+**Build n8n automations and Python agents with a local AI, through conversation.**
 
-برای طرح‌های ساده، مدل یک IR محدود می‌سازد. برای طرح‌های پیشرفته، کاتالوگ گره‌های
-n8n و NativeSpec قابل گسترش در دسترس است؛ compiler هر دو مسیر قطعی است.
-Master می‌تواند با مجوز همان گفتگو فایل بخواند و بنویسد، فرمان اجرا کند، APIهای
-ثبت‌شده را فراخوانی کند و برای بات یا حساب شخصی تلگرام اتوماسیون بسازد.
-ساخت، ارسال و فعال‌سازی سه عملیات
-جدا هستند. **هیچ Workflow با درخواست ساخت یا ارسال، فعال نمی‌شود.**
+BisCode is a local agent builder with an English chat interface and support for
+Persian conversations. It turns requests into reviewable n8n workflows, and can
+create, edit, and test Python code with access you approve for each chat.
 
-## کدنویسی محلی با BisCode
+The primary workflow is **describe → build → inspect → deploy inactive → approve activation**.
+Ollama runs the model on your machine; no paid model API key is required.
 
-تمرکز اصلی همچنان n8n است. در انتخاب‌گر «روش ساخت» می‌توانی **Python** یا
-**کدنویسی روی پروژه** را هم انتخاب کنی. در حالت خودکار، درخواست صریح Python
-به مسیر کدنویسی می‌رود و سایر درخواست‌های ساخت ایجنت به n8n می‌روند.
+![BisCode workspace](docs/images/biscode-workspace.png)
 
-مثال: «یک ایجنت Python مستقل بساز که با Ollama متن فارسی را خلاصه کند؛ فایل‌ها
-را بساز و تست کن.» ابتدا کارت دسترسی نمایش داده می‌شود. پوشه و سطح دسترسی را
-بررسی کن؛ «اجازه و ادامه» همان کار را از سر می‌گیرد. اجازه فقط برای همان گفتگو
-و چهار ساعت است. انتخاب دسترسی سیستم، اجرای فرمان با حساب کاربر فعلی را مجاز
-می‌کند؛ محیط ایزوله یا دسترسی خودکار root نیست.
+[Quick start](#quick-start) · [Connect n8n](#connect-n8n) ·
+[Local coding](#local-coding) · [Configuration](#configuration) ·
+[Development](#development) · [Architecture](docs/architecture.md)
 
-BisCode می‌تواند فایل‌ها را جستجو و ویرایش کند، پروژهٔ Python بسازد، تست اجرا
-کند و بر اساس خطا اصلاح کند. ویرایش فایل موجود به نسخهٔ خوانده‌شده متصل است تا تغییرهای
-تازه بی‌صدا از بین نروند. از «پروژه‌ها و کدنویسی»، فایل‌ها، تغییرات ثبت‌شده،
-خروجی واقعی تست و ZIP پروژه را ببین. پروژهٔ ساخته‌شده خودکار به سرویس فعال
-تبدیل نمی‌شود. «توقف کار» فرمان جاری را هم متوقف می‌کند.
+## What you can build
 
-```bash
-uv run biscode serve --workspace /absolute/path/to/project
-# بررسی واقعی ساخت، اصلاح کد و اجرای تست با مدل نصب‌شده؛ در پوشهٔ موقت
-make smoke-coding
-```
+- **n8n workflows:** Generate a typed intermediate representation, validate its
+  structure and policy, and compile it into n8n JSON. Use the native node catalog
+  for more advanced integrations and installed node types.
+- **Python agents:** Create a standalone Ollama agent with a CLI, local HTTP
+  endpoint, configuration, tests, and a downloadable project archive. Customize
+  the starting template for the requested behavior.
+- **Local code:** Inspect a selected folder, search source files, create and edit
+  code, review diffs, run checks, and iterate on failures.
+- **Telegram automation:** Configure a bot or personal account, review the
+  workflow, and explicitly start a local message listener. The supplied bridge
+  handles incoming text; scheduling, contact processing, and other behavior
+  require a matching workflow or custom code.
 
-نام داخلی پکیج، کلیدهای تنظیمات و فرمان قدیمی `master-local` برای سازگاری حفظ
-شده‌اند. [قرارداد کدنویسی، مجوزها و محدودیت‌های اجرا](docs/coding.md)
+The workspace includes persistent chat history, search, pinning, chat deletion,
+workflow inspection, access approval, connection management, and execution logs.
+The interface is English; **the model's Persian instructions and multilingual
+input support are preserved**. Persian messages retain their natural text direction.
 
-## وضعیت بررسی‌شده روی این سیستم
+## Quick start
 
-در ۱۹ نوامبر ۲۰۲۶:
+### Requirements
 
-- محیط مجازی پروژه با Python 3.13.17 و وابستگی‌های قفل‌شده ساخته شد.
-- Ollama پاسخ داد و مدل دقیق `qwen3.5:9b` با اندازهٔ 9B و کوانتایز Q4_K_M موجود بود.
-- تست واقعی مدل → IR معتبر → JSON غیرفعال n8n در اولین تلاش موفق شد.
-- در نسخهٔ 0.3، بررسی واقعی Qwen برای خواندن وضعیت، نوشتن و خواندن فایل و
-  ساخت پیش‌نویس مخصوص اتصال بات و حساب شخصی تلگرام نیز موفق شد. اتصال‌های این
-  تست آزمایشی بودند؛ ورود یا ارسال واقعی تلگرام انجام نشد.
-- Docker در سیستم پیدا نشد و n8n روی پورت 5678 اجرا نبود.
-- برای اتصال واقعی، نصب Docker و ساخت کلید API در n8n هنوز لازم است.
-- هیچ Workflow واقعی ارسال یا فعال نشده است.
+- Python **3.13 or 3.14** and [uv](https://docs.astral.sh/uv/).
+- A running [Ollama](https://ollama.com/) instance with the configured model.
+- Docker Engine and Compose **only when running n8n with the supplied Compose file**.
+- Node.js 22+ only for JavaScript tests; the web interface has no Node.js runtime
+  or frontend build requirement.
 
-نتیجهٔ آزمایش واقعی در `outputs/live-ollama-smoke.json` ذخیره می‌شود.
-
-## رابط چت فارسی
-
-با اجرای `make run`، رابط چت در [Master محلی](http://127.0.0.1:8000/) آماده است.
-روی «اتصال به فضای کاری» بزن و `MASTER_API_KEY` از `.env` را وارد کن.
-می‌توانی گفتگو کنی، درخواست ساخت ایجنت بدهی و با پیام بعدی همان طرح را اصلاح کنی.
-تاریخچه ذخیره می‌شود و گره‌ها، اتصال‌ها و JSON واقعی در پنل Workflow نمایش داده می‌شوند.
-
-پس از تنظیم اتصال n8n، از همان پنل Workflow را به‌صورت غیرفعال ارسال کن.
-فعال‌سازی فقط از پنجرهٔ بازبینی و با انتخاب تأیید و زدن دکمهٔ فعال‌سازی انجام می‌شود.
-برای اجرا به frontend جدا یا Node نیاز نیست؛ تست‌های رابط با `make test-ui` اجرا می‌شوند.
-[راهنمای کامل رابط گفتگو](docs/chat-ui.md)
-
-## Master Local Agent
-
-از دکمهٔ **Local Agent و اتصال‌ها** وارد پنل جدید شو:
-
-1. در بخش دسترسی، برای همین گفتگو «پوشهٔ پروژه» یا «سیستم و ترمینال» را انتخاب کن.
-   دسترسی سیستم به تأیید صریح نیاز دارد و پیش‌فرض چهار ساعت اعتبار دارد.
-2. در بخش اتصال‌ها، بات تلگرام، اکانت شخصی تلگرام یا یک HTTP API ثبت کن.
-   کلیدها و نشست تلگرام رمز می‌شوند و وارد تاریخچهٔ چت نمی‌شوند.
-3. برای حساب شخصی، ورود با شماره، کد و در صورت نیاز رمز دومرحله‌ای در همان پنل انجام می‌شود.
-4. در چت درخواستت را بده؛ مثلاً «برای اتصال support_bot یک دستیار پاسخ‌گوی فارسی بساز».
-5. طرح را بررسی کن، غیرفعال به n8n بفرست و فقط با تصمیم خودت فعال کن.
-6. در بخش اتوماسیون، اتصال را به طرح وصل کن و با تأیید دریافت و پاسخ خودکار، شنونده را شروع کن.
-   حساب شخصی به انتخاب صریح چت‌ها نیاز دارد.
-
-پل محلی، پیام متنی تلگرام را به Webhook واقعی n8n می‌رساند و پاسخ Workflow را به
-همان چت برمی‌گرداند؛ برای این مسیر نیازی به آدرس عمومی یا tunnel نیست.
-خود Master باید روی سیستم روشن بماند. قالب آماده متن را پوشش می‌دهد؛ فایل و رسانه
-به ابزار یا Workflow اختصاصی نیاز دارند.
-
-برای دسترسی به سیستم میزبان، Master را با Python روی **خود میزبان** اجرا کن.
-اجرای داخل Docker فقط به محیط و mountهای همان کانتینر دسترسی دارد.
-دسترسی سیستم فرمان‌ها را با اختیارات کاربر فعلی اجرا می‌کند؛ محیط ایزوله نیست.
-[راهنمای اتصال‌ها، گره‌های نصب‌شده، افزونه‌ها و بازیابی پیام](docs/local-agent.md)
-
-## ۱. نصب و تنظیم محلی
-
-از پوشهٔ پروژه اجرا کنید:
+Run these commands from the repository root:
 
 ```bash
 uv sync --frozen --group dev
 uv run python scripts/bootstrap.py
-uv run python scripts/doctor.py
+ollama pull qwen3.5:9b
+mkdir -p work/projects
+uv run biscode serve --workspace "$PWD/work/projects"
 ```
 
-اسکریپت bootstrap فایل خصوصی `.env` و یک `MASTER_API_KEY` تصادفی می‌سازد؛
-فایل موجود را بازنویسی نمی‌کند و کلید را در خروجی چاپ نمی‌کند. این مرحله در محیط
-فعلی انجام شده است. خروجی ناموفق doctor تا آماده‌شدن Docker و n8n طبیعی است.
+Skip the model download if that exact tag is already installed. If Ollama is not
+running, start it using your installation's normal service or `ollama serve`.
 
-تنظیمات مهم در `.env`:
+Open **[http://127.0.0.1:8000](http://127.0.0.1:8000)**, select **Connect workspace**,
+and enter `MASTER_API_KEY` from your private `.env` file. Bootstrap generates a
+random key without printing it and preserves an existing `.env`.
 
-```dotenv
-OLLAMA_BASE_URL=http://127.0.0.1:11434
-OLLAMA_MODEL=qwen3.5:9b
-N8N_BASE_URL=http://127.0.0.1:5678
-N8N_OLLAMA_BASE_URL=http://127.0.0.1:11434
-N8N_API_KEY=
-HTTP_ALLOWED_HOSTS=[]
-```
+Use `--port 8001` if you want a different port. Run **one application process and
+one worker per database**. Do not start a second copy against the same SQLite file.
 
-دو آدرس Ollama جدا هستند: اولی از دید برنامهٔ پایتون، دومی از دید Workflow
-داخل n8n. تنظیمات پیش‌فرض برای همین سیستم Linux و شبکهٔ host در Docker هستند.
-مدل موجود است؛ نیازی به دانلود دوبارهٔ آن نیست. برای بررسی دستی:
+You can start planning workflows and working with Python before n8n is connected.
+Deploying workflows requires the n8n configuration below.
+
+## Your first workflow
+
+Choose **n8n workflow** or leave the build method on **Auto**, then try:
+
+> Build a Persian-speaking assistant that receives `body.message` through a POST
+> webhook, answers with Ollama, and returns JSON.
+
+Or write the request directly in Persian. Refine the same draft with follow-up
+messages, inspect its nodes and JSON, and download the artifact for manual import.
+Revisions create new builds rather than silently overwriting an existing workflow.
+
+For a reproducible example from the command line, with BisCode running:
 
 ```bash
-ollama list
-```
-
-## ۲. اجرای API
-
-```bash
-uv run master-local serve --workspace /absolute/path/to/your/project
-```
-
-راهنمای تعاملی API در [Swagger](http://127.0.0.1:8000/docs) است.
-روی Authorize بزنید و مقدار `MASTER_API_KEY` از `.env` را وارد کنید.
-مسیرهای `/api/v1/*` به این کلید نیاز دارند. `/healthz` فقط زنده‌بودن برنامه را نشان می‌دهد؛
-`/api/v1/system` اتصال به Ollama و n8n را جدا بررسی می‌کند.
-
-**یک process و یک worker برای هر دیتابیس اجرا کنید.** از `--reload` هنگام ارسال یا
-فعال‌سازی استفاده نکنید. برنامهٔ محلی با `.env` فعلی آمادهٔ اجراست.
-
-## ۳. اولین ساخت، حتی بدون n8n
-
-در ترمینال دوم و با API روشن:
-
-```bash
-uv run python examples/build_client.py --prompt 'یک دستیار فارسی بساز که پیام را با Webhook از body.message بگیرد، با Ollama جواب بدهد و پاسخ JSON برگرداند.'
-```
-
-یا بدون استفاده از مدل، یک IR آماده را کامپایل کنید:
-
-```bash
+# Compile the supplied IR without calling the model or writing to n8n.
 uv run python examples/build_client.py --ir examples/assistant.ir.json
+
+# Generate a draft with the configured local model.
+uv run python examples/build_client.py \
+  --prompt 'Build a POST webhook assistant that reads body.message, answers with Ollama, and returns JSON.'
 ```
 
-شناسهٔ ساخت و دو فایل در `outputs/` برگردانده می‌شود: گزارش ساخت و JSON مناسب
-Import در n8n. وضعیت ساخت `draft` است و هیچ درخواست نوشتنی به n8n ارسال نشده است.
-نمونهٔ `examples/manual.ir.json` برای اجرای دستی در ویرایشگر n8n نیز آماده است.
+The client writes a build report and importable workflow JSON to `outputs/`.
+A draft does not execute or activate anything in n8n.
 
-## ۴. راه‌اندازی n8n با Docker
+## Connect n8n
 
-این Compose برای **Linux محلی** طراحی شده است. `network_mode: host` به n8n اجازه
-می‌دهد به Ollama فعلی روی `127.0.0.1:11434` برسد، بدون تغییر تنظیمات سرویس Ollama.
-n8n فقط روی `127.0.0.1:5678` گوش می‌دهد. برای Windows/macOS باید شبکه و آدرس
-Ollama را متناسب با Docker Desktop تنظیم کنید؛ این پیکربندی برای آن‌ها آزمایش نشده است.
-
-اگر Docker نصب نیست، ابتدا مطابق [راهنمای رسمی Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
-Docker Engine و Compose را نصب کنید. نصب سراسری یا تغییر سرویس سیستم توسط پروژه انجام نمی‌شود.
-سپس:
+The supplied Compose configuration targets a **local Linux host**. It uses host
+networking so n8n can reach a native Ollama instance on loopback, and binds n8n to
+`127.0.0.1:5678`. The default image is pinned in `compose.yaml`; override it with
+`N8N_IMAGE` when deliberately upgrading.
 
 ```bash
 docker compose config --quiet
 docker compose up -d n8n
-docker compose ps
 ```
 
-نسخهٔ هدف `2.48.5` است و در `.env` قابل تغییر است. داده‌ها در volume به نام
-`n8n_data` می‌مانند؛ کلید رمزگذاری n8n نیز در همین volume حفظ می‌شود.
+1. Open [http://localhost:5678](http://localhost:5678) and create the n8n owner account.
+2. Create an n8n API key under **Settings → n8n API**.
+3. Set `N8N_API_KEY` in `.env`, then restart BisCode.
+4. Run `uv run biscode doctor` to check model availability and n8n authentication.
 
-1. [n8n محلی](http://localhost:5678) را باز کنید و حساب مالک بسازید.
-2. در Settings → n8n API یک API key بسازید.
-3. مقدار آن را در `N8N_API_KEY` داخل `.env` بگذارید.
-4. API پایتون را بعد از تغییر `.env` دوباره اجرا کنید.
-5. `uv run python scripts/doctor.py` را اجرا کنید.
+`OLLAMA_BASE_URL` is the address used by BisCode. `N8N_OLLAMA_BASE_URL` is the
+address used by generated workflows running in n8n. These may differ when the
+services run on different hosts or networks. Adapt networking for Docker Desktop
+on macOS or Windows; the supplied host-network setup targets Linux.
 
-دسترسی‌های لازم: ساخت، خواندن و فهرست Workflow؛ برای فعال/غیرفعال‌سازی و خواندن
-اجرای‌ها، scope مربوط به همان عملیات را هم بدهید. نام دقیق scope را در نسخهٔ
-n8n نصب‌شده بررسی کنید. برای مرحلهٔ ساخت و ارسال نیازی به scope فعال‌سازی نیست.
-[مستند احراز هویت n8n](https://docs.n8n.io/connect/n8n-api/authentication.md)
+Use **Deploy to n8n** to create an **inactive** workflow. Activation requires a
+separate **Review & activate** action and approval of the exact reviewed version.
+The API rechecks its content fingerprint and n8n version before activation.
 
-برای اجرای خود builder در Docker نیز Dockerfile و پروفایل اختیاری موجود است:
-
-```bash
-docker compose --profile app up -d --build
-```
-
-هم‌زمان نسخهٔ پایتون محلی را روی پورت 8000 اجرا نکنید. دیتابیس نسخهٔ کانتینری
-در volume جدا به نام `builder_data` است.
-
-## ۵. ارسال غیرفعال و بازبینی
+An optional command-line review flow is also available:
 
 ```bash
 uv run python examples/build_client.py --ir examples/assistant.ir.json --deploy
-```
-
-این دستور Workflow را در n8n ایجاد می‌کند و شناسهٔ ساخت را چاپ می‌کند؛
-وضعیت محلی `deployed` و وضعیت n8n غیرفعال است. JSON خام ارسالی به API شامل
-فیلدهای فقط‌خواندنی مثل `active` نیست؛ فایل Import شامل `active:false` است.
-
-طرح، مسیرها، prompt، مقصد درخواست‌ها و اتصال گره‌ها را در n8n بررسی کنید.
-اگر Workflow را در n8n ویرایش کنید، فعال‌سازی از این برنامه به‌علت اختلاف محتوا
-متوقف می‌شود؛ تغییر را در IR ثبت کنید و ساخت جدید بسازید.
-
-## ۶. فعال‌سازی فقط با تأیید مالک
-
-این مرحله **اختیاری و جدا** است؛ فقط پس از بازبینی و تصمیم خودتان اجرا کنید:
-
-```bash
 uv run python scripts/review_activation.py BUILD_ID
 ```
 
-اسکریپت نسخهٔ n8n را می‌خواند، آن را با خروجی compiler مقایسه می‌کند، فایل بازبینی
-را ذخیره می‌کند و از شما می‌خواهد عبارت دقیق `ACTIVATE <workflow-id>` را تایپ کنید.
-ورودی خالی، قطع ورودی یا عبارت دیگر، هیچ درخواستی برای فعال‌سازی ارسال نمی‌کند.
-برنامه پیش از درخواست نهایی، اثرانگشت و `versionId` را دوباره بررسی می‌کند.
+The second command requests a workflow-specific confirmation phrase. It does not
+activate a workflow if the confirmation is missing or incorrect.
 
-مسیر HTTP فعال‌سازی نیز فقط با کلید مالک، `confirm: true` از نوع boolean و هر دو
-اثر انگشت معتبر کار می‌کند. کلید مالک و این اسکریپت در اختیار ابزارهای مدل نیستند.
-این کنترل، تأیید caller احرازشده را ثبت می‌کند؛ API امکان تشخیص حضور فیزیکی انسان ندارد.
+## Local coding
 
-پس از تأیید و فعال‌سازی دستیار نمونه، می‌توان آن را فراخوانی کرد:
+Choose **Python agent** for a new AI agent, or **Local coding** for scripts,
+libraries, and changes to an existing project. n8n remains the default for agent
+requests in Auto mode; explicit Python and coding requests can use the coding path.
+
+> Create a Python agent that summarizes Persian text with Ollama. Write the files
+> and tests, run the checks, and keep the service stopped.
+
+Before using local files, BisCode opens an access request:
+
+1. Choose an existing workspace folder.
+2. Review the scope: workspace files, or files and system commands.
+3. Confirm and select **Approve & continue** to resume the saved request.
+
+Access is scoped to the chat and expires after four hours by default. Running
+commands and tests requires system access and uses your current OS user privileges.
+This is not an operating-system sandbox and does not grant root privileges.
+Use **Stop** to cancel the current task, including its running subprocess.
+
+Edits are guarded against the last observed or successfully written file version.
+Outside changes cause a conflict rather than a silent overwrite. Python checks
+record real subprocess output and test counts; a suite with zero tests is not
+reported as passing. The generated AI agent starts as a stateless chat template;
+requested integrations still need to be implemented and tested.
+
+Open **Projects & code** to review managed changes and Python agent project files,
+test results, and ZIP downloads. Creating files does not start a persistent service.
+
+See [the local coding contract](docs/coding.md) for tools, version guards, permissions,
+continuation, and execution boundaries.
+
+## Connections and Telegram
+
+Open **Local Agent** to manage access, integrations, bindings, and logs.
+
+- Register Telegram bot tokens, personal account credentials, or HTTP API connections
+  through the connection forms. Do not place credentials or login codes in chat.
+- Personal accounts sign in with a phone number, login code, and, when required,
+  a two-step verification password.
+- After reviewing and activating a compatible workflow, save a Telegram binding
+  and separately approve starting its listener. Personal accounts require explicit
+  chat selection.
+- The local bridge forwards incoming text to the workflow webhook and returns its
+  response. This path does not require a public tunnel; BisCode must remain running.
+- Uncertain delivery outcomes are recorded for review rather than automatically
+  resent. Explicit retries acknowledge the risk of duplicate effects.
+
+See [the local runtime guide](docs/local-agent.md) for connector setup, node catalog
+imports, plugins, and delivery recovery.
+
+## Configuration
+
+Bootstrap copies `.env.example`. The main settings are:
+
+| Setting | Purpose | Default |
+| --- | --- | --- |
+| `MASTER_API_KEY` | Owner authentication for the control API | Generated by bootstrap |
+| `OLLAMA_BASE_URL` | Ollama endpoint reachable by BisCode | `http://127.0.0.1:11434` |
+| `OLLAMA_MODEL` | Exact installed Ollama model tag | `qwen3.5:9b` |
+| `OLLAMA_NUM_CTX` | Model context budget | `16384` |
+| `OLLAMA_NUM_PREDICT` | Maximum generated tokens per model response | `6000` |
+| `N8N_BASE_URL` | n8n endpoint reachable by BisCode | `http://127.0.0.1:5678` |
+| `N8N_API_KEY` | n8n API authentication | Empty until configured |
+| `N8N_OLLAMA_BASE_URL` | Ollama endpoint reachable by n8n workflows | `http://127.0.0.1:11434` |
+| `DATABASE_PATH` | SQLite database for chats, builds, and runtime state | `data/master-agent.sqlite3` |
+| `LOCAL_WORKSPACE` | Default folder offered for local access | Current working directory |
+| `LOCAL_VAULT_KEY` | Credential encryption key file | `vault.key` beside the database |
+| `LOCAL_MAX_STEPS` | Maximum tool steps for n8n conversations | `10` |
+| `CODING_MAX_STEPS` | Maximum tool steps for coding conversations | `20` |
+| `HTTP_ALLOWED_HOSTS` | Allowed external hosts in the small IR | `[]` |
+
+Restart the application after changing `.env`. Keep the model tag identical to an
+entry in `ollama list`. Ollama remains the model backend; changing the UI language
+does not download, replace, or change the model's weights.
+
+## Architecture
+
+The backend is **Python + FastAPI + LangGraph**, with SQLite persistence and a
+bundled HTML/CSS/JavaScript interface.
+
+- **Planning:** The model produces structured decisions or a typed workflow IR.
+  The LangGraph planner validates and repairs the small IR within a bounded budget.
+- **Compilation:** Pure, deterministic compilation converts validated IR or
+  catalog-backed NativeSpec into n8n JSON.
+- **Execution:** A tool registry enforces chat permissions, validates tool inputs,
+  and returns bounded, redacted observations to the model.
+- **Lifecycle:** Deployment, reconciliation, review, and activation are separate
+  operations with persisted state and explicit owner approval.
+
+The small IR supports manual, webhook, and minute-schedule triggers; scalar fields;
+string conditions; allowlisted HTTPS requests; Ollama calls; and webhook responses.
+NativeSpec extends this with registered n8n nodes, credentials, and richer graphs.
+Structural validity does not establish that a workflow satisfies every requirement
+or will execute successfully against a particular n8n installation.
+
+See [architecture and API contracts](docs/architecture.md) for detailed schemas,
+lifecycle transitions, concurrency, and activation safeguards.
+
+## Development
 
 ```bash
-curl --fail-with-body http://localhost:5678/webhook/persian-assistant \
-  -H 'Content-Type: application/json' \
-  -d '{"message":"سلام؛ در یک جمله خودت را معرفی کن."}'
+make test       # Python regression tests; integrations use mocked transports
+make test-ui    # JavaScript tests, including Persian UTF-8 handling
+make check      # Python lint and formatting checks
+uv build        # Build the source distribution and wheel
 ```
 
-متن پاسخ در `message.content` از خروجی Ollama قرار دارد. Webhook این MVP احراز هویت
-ندارد و Compose ارائه‌شده برای دسترسی محلی است. تا قبل از تأیید فعال‌سازی،
-این مسیر production آماده نیست؛ برای تست دستی می‌توانید از حالت Test در ویرایشگر n8n استفاده کنید.
-
-## تست‌ها و عیب‌یابی
+Optional checks against your installed Ollama model:
 
 ```bash
-uv run pytest -q
-uv run ruff check .
-uv run ruff format --check .
-uv run python scripts/smoke_ollama.py
-# بررسی واقعی مدل + ابزار فایل + طرح بات و اکانت شخصی با اتصال‌های آزمایشی
-make smoke-local
+make smoke          # Model → validated IR → compiled JSON
+make smoke-local    # Local tools and Telegram drafts with test connections
+make smoke-coding   # Create, edit, and test a Python agent in a temporary folder
 ```
 
-تست‌های عادی آفلاین‌اند و رفتار n8n را شبیه‌سازی می‌کنند، از جمله تأیید ناقص،
-تغییر نسخه بعد از بازبینی، قطع ارتباط، هم‌زمانی و جلوگیری از ارسال تکراری.
-اسکریپت smoke واقعاً Ollama را فراخوانی می‌کند و با n8n ارتباط نمی‌گیرد.
-به‌دلیل نبود Docker، Import و اجرای واقعی داخل n8n در این سیستم هنوز بررسی نشده است.
+These checks do not prove live n8n or Telegram delivery. Review and test those
+integrations separately in your configured environment.
 
-- `503 / not_configured`: مقدار `N8N_API_KEY` را تنظیم و API را دوباره اجرا کنید.
-- `model_missing`: نام دقیق مدل در `.env` باید با `ollama list` یکسان باشد.
-- کندی مدل: درخواست ساخت ممکن است چند دقیقه طول بکشد؛ بودجهٔ پیش‌فرض سه تلاش است.
-  خروجی ساخت را بازبینی کنید؛ اعتبار ساختاری، درستی معنایی خواسته را تضمین نمی‌کند.
-- `409` هنگام فعال‌سازی: محتوا، نسخه یا وضعیت عوض شده است؛ بازبینی تازه بگیرید.
-- `deployment_unknown`: پاسخ ارسال نامشخص است؛ دوباره POST نزنید. شناسهٔ Workflow
-  را در n8n پیدا کنید و `POST /api/v1/builds/BUILD_ID/reconcile` با
-  `{"workflow_id":"N8N_WORKFLOW_ID"}` بفرستید.
-- `activation_unknown`: با همان مسیر و بدنهٔ `{}` وضعیت n8n فقط خوانده و تطبیق داده می‌شود.
+## Troubleshooting
 
-## مسیر ساده و مسیر پیشرفته
+- **No response after a coding request:** Check the access request. Choose a folder,
+  approve the scope, and select **Approve & continue**. The original prompt is saved.
+- **Model unavailable:** Check `ollama list`, the exact model tag, and the Ollama URL.
+- **Slow coding tasks:** A task can involve many model calls, file edits, and tests.
+  Generation speed alone does not describe total completion time. Check actual tool
+  activity, context size, and GPU offloading before choosing a larger model.
+- **n8n is not configured:** Set `N8N_API_KEY`, restart BisCode, and run `biscode doctor`.
+- **409 during activation:** The workflow or its version changed. Review it again.
+- **Uncertain deployment or activation:** Reconcile the existing state before retrying.
+  A lost response does not prove that the remote operation failed.
 
-IR 1.0 همچنان برای دستیارهای ساده و درخت‌های کوچک محدود است. مسیر NativeSpec
-گره‌های ثبت‌شده، Credential ID موجود در n8n، کد، اتصال چند ورودی، چند trigger و loop را
-می‌پذیرد. برای گره‌های خارج از کاتالوگ اولیه، metadata نصب واقعی n8n را وارد کن یا
-افزونهٔ پایتون ثبت کن. اعتبار ساختاری، اجرای موفق و معنای درست همهٔ گره‌ها را تضمین
-نمی‌کند؛ تست و بازبینی در n8n همچنان لازم است. مدل 9B نیز ممکن است در طرح پیچیده
-نیاز به اصلاح داشته باشد.
+## Data and operating boundaries
 
-HTTP خارجی در **IR ساده** به‌صورت پیش‌فرض بسته است. برای یک میزبان مورداعتماد، مثلاً
-`HTTP_ALLOWED_HOSTS=["httpbin.org"]` را تنظیم کنید؛ فقط HTTPS روی 443 و بدون redirect مجاز است.
+BisCode is designed for a single owner on loopback. API control requires the owner
+key. Integration credentials and code-change snapshots are encrypted; chat messages
+and other SQLite metadata are stored locally without application-level encryption.
+Back up both the database and its vault key. Losing the key prevents decryption of
+existing encrypted records.
 
-- `src/master_agent/ir.py`: schema نسخه‌دار IR و گره‌های مجاز.
-- `validator.py` و `compiler.py`: اعتبارسنجی و تبدیل قطعی.
-- `planner.py`: گراف تولید، اعتبارسنجی و اصلاح محدود با LangGraph.
-- `clients.py`: کلاینت‌های Ollama و n8n REST API.
-- `repository.py` و `service.py`: SQLite، وضعیت‌ها، تطبیق و تأیید.
-- `api.py`: مسیرهای FastAPI و احراز هویت.
-- `local/`: ابزارهای سیستم، خزانهٔ رمز‌شده، اتصال‌ها، پل تلگرام و کاتالوگ NativeSpec.
-- `__main__.py`: فرمان‌های `master-local serve` و `master-local doctor`.
-- `tests/`: تست‌های خودکار؛ `examples/`: نمونه‌های قابل استفاده.
-- [معماری، قرارداد API و منابع رسمی](docs/architecture.md).
+Workspace access limits managed file tools to the approved folder. System access
+allows arbitrary commands as the OS user and is not confined by that file boundary.
+Run the Python application on the host for host access; a Docker deployment has
+access only to its container environment and mounted volumes.
 
-فایل `.env`، دیتابیس، خروجی‌ها و پوشهٔ `work/` وارد git نمی‌شوند. داده‌های n8n
-در volume و داده‌های builder در SQLite ذخیره می‌شوند؛ پیش از تغییر نسخه از آن‌ها نسخهٔ پشتیبان بگیرید.
+`.env`, databases, vault keys, sessions, generated outputs, and `work/` are excluded
+from Git. Review generated code and workflows before running or activating them.
+The internal Python package remains `master_agent`, and `master-local` is retained
+as a compatible CLI alias.
+
+## Documentation
+
+- [Chat workspace](docs/chat-ui.md)
+- [Local coding and permissions](docs/coding.md)
+- [Local Agent, connectors, and plugins](docs/local-agent.md)
+- [Architecture and API contracts](docs/architecture.md)
+- [Example workflows](examples/)
+
+## License
+
+[MIT](LICENSE). The bundled Vazirmatn font is distributed under its own
+[Open Font License](src/master_agent/web/fonts/OFL.txt).

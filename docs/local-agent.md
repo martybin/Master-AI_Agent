@@ -14,7 +14,7 @@ uv run master-local serve --workspace /absolute/path/to/automation-workspace
 ```
 
 Open `http://127.0.0.1:8000`, enter the owner key from `.env`, create a chat and
-open **Local Agent و اتصال‌ها**. Nothing is uploaded to a cloud model. Calls to
+open **Local Agent**. Nothing is uploaded to a cloud model. Calls to
 configured integrations still transmit the data needed by those integrations.
 The supplied n8n Docker service is independent; host tools need the Python
 runtime on the host. Running Master inside Docker gives container access only.
@@ -58,7 +58,7 @@ it does not isolate an unrestricted local process. For untrusted workloads use
 a separate OS account/container with limited mounts and network access.
 
 Commands use argument arrays, bounded output, a 1–120 second deadline and a new
-process group on POSIX. **توقف کار** cancels the chat task and kills its current
+process group on POSIX. **Stop** cancels the chat task and kills its current
 command group. Browser disconnect alone does not cancel it. Revoking a grant
 blocks subsequent tools; use cancellation to stop a tool already running.
 Cancellation cannot undo side effects already completed by external programs.
@@ -85,9 +85,9 @@ prevents decrypting connections/inbox; startup refuses to silently replace a
 missing key when encrypted records exist. This is local encrypted storage, not
 an OS keychain or hardware security module.
 
-For a **bot**, create a BotFather token, choose «بات تلگرام», register it, then
+For a **bot**, create a BotFather token, choose **Telegram bot**, register it, then
 verify. For a **personal account**, obtain your own Telegram `api_id`/`api_hash`,
-choose «اکانت شخصی», register it, then select «ورود به حساب». Enter the phone,
+choose **Personal account**, register it, then select **Sign in**. Enter the phone,
 Telegram login code and optional 2FA password in the panel. The login flow
 supports the code/password path; Telegram may refuse delivery or require a
 different sign-in method. Pending sign-ins expire after ten minutes. Codes,
@@ -105,7 +105,7 @@ handled locally, while n8n executes the automation.
 
 1. Review the draft and deploy it inactive using the existing UI.
 2. Review and explicitly activate the exact n8n version in the owner dialog.
-3. In Local Agent → اتوماسیون, select connection and build, then save binding.
+3. In Local Agent → Automation, select connection and build, then save binding.
 4. For personal accounts, load dialogs and select chat IDs. A nonempty explicit
    allowlist is required. For bots, an empty list allows all received chats.
 5. Default reply path is `message.content`, the Ollama JSON output. Empty means
@@ -202,7 +202,7 @@ docker compose exec -T n8n n8n export:nodes --output=/tmp/master-nodes.json
 docker compose cp n8n:/tmp/master-nodes.json work/n8n-nodes.json
 ```
 
-In Local Agent → دسترسی, grant workspace access and import
+In Local Agent → Access, grant workspace access and import
 `work/n8n-nodes.json` (path relative to the configured workspace; use an absolute
 path within it if needed). The importer converts metadata into parameter
 schemas and retains original property descriptions. `catalog.search` and

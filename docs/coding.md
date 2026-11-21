@@ -28,7 +28,7 @@ changes. The model may also call `access.request`, or a denied file/command tool
 can create a request for the missing scope. None of these grant permission.
 
 The owner sees reason, editable workspace, level, four-hour duration and an
-unchecked confirmation. **اجازه و ادامه** approves through an authenticated
+unchecked confirmation. **Approve & continue** approves through an authenticated
 owner API and resumes the same original task. The owner can grant only workspace
 access; executing tests/commands then requires a separate system grant. Rejecting
 does not run the task. Old requests cannot authorize a newer task or a changed
@@ -141,37 +141,44 @@ request staleness/replay, path scope, edit conflicts, encrypted history, archive
 containment, stale/empty checks and cancellation. Keep one BisCode process and
 one worker per database.
 
-## وقتی بعد از پرامپت ادامه‌ای نمی‌بینی
+## When a coding request appears to be waiting
 
-پیش از اولین نوشتن فایل، BisCode درخواست دسترسی ثبت می‌کند و پنجرهٔ انتخاب پوشه
-و سطح اجازه را باز می‌کند. این مرحله هنوز کد را اجرا نکرده است. پوشه را انتخاب کن،
-تأیید را علامت بزن و «اجازه و ادامه» را بزن. اگر صفحه را ببندی، درخواست معلق در
-چت ذخیره می‌ماند و پس از ورود دوباره نمایش داده می‌شود. درخواست قبلاً تأییدشده
-خودکار دوباره اجازه نمی‌گیرد. برای اجرای تست به سطح اجرای فرمان نیاز است.
+Before its first file operation, BisCode records an access request and opens the
+workspace approval dialog. Choose a folder, review the scope, select the explicit
+confirmation, and click **Approve & continue**. The saved request resumes after
+approval. Closing the page preserves a pending request; it is shown again when
+you reconnect. Approved requests are not automatically reapproved. Tests require
+system access.
 
-رابط علاوه بر رویدادهای زنده، وضعیت پیام در حال پردازش را از دیتابیس بررسی
-می‌کند؛ اگر رویداد پایان اتصال از دست برود، پاسخ ذخیره‌شده بازیابی می‌شود.
-«کدنویسی روی پروژه» برای اسکریپت‌ها و ابزارهای معمولی از نوشتن فایل و اجرای تست
-استفاده می‌کند. قالب آمادهٔ چت با Ollama به روش «ساخت ایجنت Python» اختصاص دارد.
+The interface checks the durable message state alongside live events. If the
+final SSE event is lost, it recovers the saved response. **Local coding** uses file
+editing and checks for scripts and libraries. **Python agent** exposes the
+starting Ollama agent template.
 
-اگر اجرای دسکتاپ فرمان `python` یا `python3` را در PATH پیدا نکند، آن نام ساده
-به مفسر Python خود BisCode تبدیل می‌شود. مسیر صریح مفسر و فرمان‌های دیگر تغییر
-نمی‌کنند. `system.inspect` مسیر واقعی را با `python_executable` برمی‌گرداند.
+If a desktop launch cannot find the plain `python` or `python3` executable on PATH,
+that alias falls back to BisCode's own Python interpreter. Explicit interpreter
+paths and other executables are preserved. `system.inspect` exposes the actual
+`python_executable` path.
 
-پس از هر خواندن یا نوشتن موفق، یک revision و اثر انگشت محتوا نگه داشته می‌شود.
-ویرایش بعدی می‌تواند از همین نسخهٔ شناخته‌شده استفاده کند؛ بنابراین مدل برای هر
-اصلاح روی کدی که خودش نوشته مجبور به خواندن دوباره نیست. اگر کاربر یا برنامهٔ
-دیگری فایل را تغییر داده باشد، تطبیق اثر انگشت همچنان ویرایش را رد می‌کند و
-خواندن نسخهٔ تازه لازم است. revision صریح قدیمی هم همچنان رد می‌شود.
+A read or successful write records a content hash and revision. Follow-up edits
+can use that known snapshot without rereading unchanged files. Outside edits still
+fail the hash guard, and an explicitly stale revision remains invalid.
 
-خروجی تصمیم کدنویسی با JSON Schema جداگانه برای نام و آرگومان هر ابزار تولید
-می‌شود؛ آرگومان‌های یک ابزار نمی‌توانند به‌جای ابزار دیگر قرار بگیرند. فیلدهای
-اختیاری کپی‌کردن hash در فهرست ابزارهای مدل کوچک نشان داده نمی‌شوند، چون کنترلر
-همان محافظ نسخه را از خواندن/نوشتن واقعی اعمال می‌کند. API مستقیم همچنان revision
-و expected_sha256 صریح را می‌پذیرد و نسخهٔ اشتباه را رد می‌کند.
+Coding decisions use a JSON Schema that binds each tool name to its argument
+shape. The small model's manifest hides optional manual hash arguments; the
+controller applies the same optimistic guard using real reads and writes. The
+direct API still accepts explicit `revision` and `expected_sha256` values.
 
-برای ابزارهای عادی Python، `code.check` با `path` پوشهٔ سورس که `tests/` داخلش است
-اجرا می‌شود. فرمان تست، پوشهٔ اجرا و مفسر را کنترلر تعیین می‌کند؛ نتیجه و تعداد
-تست‌ها در `code_runs` ذخیره می‌شوند. صفر تست، timeout یا تغییر سورس حین بررسی
-قبولی محسوب نمی‌شود. این ابزار هم به اجازهٔ system نیاز دارد. شکست طرح پس از
-نوشتن فایل، مسیر فایل‌های واقعاً تغییرکرده و وضعیت تست را در همان پاسخ نشان می‌دهد.
+For ordinary Python code, `code.check` takes the source folder containing
+`tests/`. The controller selects the interpreter, command, and working directory,
+then saves the actual result and test count in `code_runs`. Zero tests, timeouts,
+or source changes during a check cannot pass. This tool requires system access.
+If planning fails after a write, the response includes the actual changed paths
+and available test status.
+
+## Interface language and Persian support
+
+The interface and system notices are English. Persian conversation text, model
+instructions, request detection, and UTF-8 input remain supported. Message bodies
+and the composer use automatic text direction, while code blocks stay LTR.
+Changing the interface language does not replace the model or rewrite saved chats.
