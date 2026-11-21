@@ -85,6 +85,10 @@ class ChatOptions(ClosedModel):
     target: Literal["auto", "n8n", "python", "code"] = "auto"
 
 
+class ChatPinRequest(ClosedModel):
+    pinned: StrictBool
+
+
 class ResumeRequest(ClosedModel):
     access_request_id: UUID
 
@@ -210,6 +214,15 @@ def create_app(
     @app.put("/api/v1/chats/{chat_id}/target", dependencies=auth)
     async def chat_target(chat_id: str, body: ChatOptions):
         return history.set_target(chat_id, body.target)
+
+    @app.put("/api/v1/chats/{chat_id}/pin", dependencies=auth)
+    async def pin_chat(chat_id: str, body: ChatPinRequest):
+        return history.set_pinned(chat_id, body.pinned)
+
+    @app.delete("/api/v1/chats/{chat_id}", dependencies=auth)
+    async def delete_chat(chat_id: str):
+        history.delete(chat_id)
+        return {"deleted": True, "id": chat_id}
 
     @app.post("/api/v1/chats/{chat_id}/resume", dependencies=auth, response_model=None)
     async def resume_chat(chat_id: str, body: ResumeRequest, request: Request):

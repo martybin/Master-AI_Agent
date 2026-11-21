@@ -224,3 +224,105 @@ async def test_chat_and_old_build_api_share_inference_lock(settings, network):
             assert blocked.status_code == 429
             release.set()
             assert (await active).status_code == 200
+
+
+def test_pins_survive_restart_and_keep_older_chats_visible(settings):
+    repo = Repository(settings.database_path)
+    repo.initialize()
+    history = ChatRepository(repo)
+    history.initialize()
+    oldest = history.create()
+    for _ in range(105):
+        history.create()
+    history.set_pinned(oldest["id"], True)
+    restarted = ChatRepository(Repository(settings.database_path))
+    restarted.initialize()
+    chats = restarted.list()
+    assert len(chats) == 106
+    assert chats[0]["id"] == oldest["id"] and chats[0]["pinned"] is True
+    assert chats[0]["updated_at"] == oldest["updated_at"]
+    assert restarted.get(oldest["id"])["pinned"] is True
+    restarted.set_pinned(oldest["id"], False)
+    assert restarted.list()[-1]["id"] == oldest["id"]
+
+
+def test_all_saved_messages_remain_available(settings):
+    repo = Repository(settings.database_path)
+    repo.initialize()
+    history = ChatRepository(repo)
+    history.initialize()
+    chat = history.create()
+    for i in range(53):
+        turn = history.start_turn(chat["id"], str(uuid4()), f"question {i}")
+        history.finish_turn(chat["id"], turn["assistant"]["id"], f"answer {i}")
+    messages = history.get(chat["id"])["messages"]
+    assert len(messages) == 106
+    assert messages[0]["content"] == "question 0"
+    assert messages[-1]["content"] == "answer 52"
+
+
+def test_pin_and_delete_require_auth_and_strict_boolean(api):
+    chat = new_chat(api)
+    path = f"/api/v1/chats/{chat}"
+    assert (
+        api.put(path + "/pin", json={"pinned": True}, headers={"Authorization": ""}).status_code
+        == 401
+    )
+    assert api.delete(path, headers={"Authorization": ""}).status_code == 401
+    for invalid in ["true", 1, None]:
+        assert api.put(path + "/pin", json={"pinned": invalid}).status_code == 422
+    assert api.put(path + "/pin", json={"pinned": True}).json()["pinned"] is True
+    assert api.get("/api/v1/chats").json()["chats"][0]["pinned"] is True
+    assert api.put("/api/v1/chats/missing/pin", json={"pinned": True}).status_code == 404
+    assert api.delete("/api/v1/chats/missing").status_code == 404
+
+
+def test_delete_clears_messages_and_access_but_preserves_artifacts(api, network):
+    network.chat_outputs = [json.dumps({"action": "reply", "message": "سلام"})]
+    chat = new_chat(api)
+    other = new_chat(api)
+    events(send(api, chat, "سلام"))
+    store = api.app.state.local_store
+    for bucket in ["grants", "access_requests", "code_revisions", "projects"]:
+        for chat_id in [chat, other]:
+            store.put(bucket, chat_id, {"chat_id": chat_id, "mode": "system"})
+    assert api.delete(f"/api/v1/chats/{chat}").json() == {"deleted": True, "id": chat}
+    assert api.get(f"/api/v1/chats/{chat}").status_code == 404
+    assert send(api, chat).status_code == 404
+    assert api.get(f"/api/v1/chats/{other}").status_code == 200
+    with api.app.state.history.builds.connect() as db:
+        assert (
+            db.execute("SELECT count(*) FROM chat_messages WHERE chat_id=?", (chat,)).fetchone()[0]
+            == 0
+        )
+    for bucket in ["grants", "access_requests", "code_revisions"]:
+        assert all(r["chat_id"] != chat for r in store.list(bucket))
+        assert store.get(bucket, other)["chat_id"] == other
+    assert store.get("projects", chat)["chat_id"] == chat
+    assert api.delete(f"/api/v1/chats/{chat}").status_code == 404
+
+
+def test_busy_chat_cannot_be_deleted(api):
+    chat = new_chat(api)
+    history = api.app.state.history
+    turn = history.start_turn(chat, str(uuid4()), "work in progress")
+    assert api.delete(f"/api/v1/chats/{chat}").status_code == 409
+    assert len(history.get(chat)["messages"]) == 2
+    history.finish_turn(chat, turn["assistant"]["id"], "done")
+    assert api.delete(f"/api/v1/chats/{chat}").status_code == 200
+
+
+def test_legacy_chat_without_pin_is_readable_and_pinnable(settings):
+    repo = Repository(settings.database_path)
+    repo.initialize()
+    history = ChatRepository(repo)
+    history.initialize()
+    chat = history.create()
+    del chat["pinned"]
+    del chat["messages"]
+    with repo.connect() as db:
+        db.execute("UPDATE chats SET data=? WHERE id=?", (json.dumps(chat), chat["id"]))
+    assert history.list()[0]["pinned"] is False
+    assert history.get(chat["id"])["pinned"] is False
+    history.set_pinned(chat["id"], True)
+    assert history.get(chat["id"])["pinned"] is True

@@ -48,6 +48,7 @@ class ChatRepository:
             "title": "گفتگوی تازه",
             "status": "idle",
             "target": target,
+            "pinned": False,
             "created_at": now(),
             "updated_at": now(),
         }
@@ -73,9 +74,11 @@ class ChatRepository:
     def list(self) -> list[dict]:
         with self.builds.connect() as db:
             rows = db.execute(
-                "SELECT data FROM chats ORDER BY json_extract(data,'$.updated_at') DESC LIMIT 100"
+                "SELECT data FROM chats ORDER BY "
+                "COALESCE(json_extract(data,'$.pinned'),0) DESC, "
+                "json_extract(data,'$.updated_at') DESC, id"
             ).fetchall()
-        return [json.loads(row[0]) for row in rows]
+        return [{"pinned": False, **json.loads(row[0])} for row in rows]
 
     def get(self, chat_id: str) -> dict:
         with self.builds.connect() as db:
@@ -83,13 +86,48 @@ class ChatRepository:
             if not row:
                 raise NotFound("Chat not found")
             messages = db.execute(
-                "SELECT data FROM chat_messages WHERE chat_id=? ORDER BY rowid DESC LIMIT 100",
+                "SELECT data FROM chat_messages WHERE chat_id=? ORDER BY rowid",
                 (chat_id,),
             ).fetchall()
         return {
+            "pinned": False,
             **json.loads(row[0]),
-            "messages": [json.loads(row[0]) for row in reversed(messages)],
+            "messages": [json.loads(row[0]) for row in messages],
         }
+
+    def set_pinned(self, chat_id: str, pinned: bool) -> dict:
+        with self.builds.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute("SELECT data FROM chats WHERE id=?", (chat_id,)).fetchone()
+            if not row:
+                raise NotFound("Chat not found")
+            chat = json.loads(row[0])
+            # Pinning must not change conversation recency.
+            chat["pinned"] = pinned
+            db.execute("UPDATE chats SET data=? WHERE id=?", (json.dumps(chat), chat_id))
+        return chat
+
+    def delete(self, chat_id: str) -> None:
+        with self.builds.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute("SELECT data FROM chats WHERE id=?", (chat_id,)).fetchone()
+            if not row:
+                raise NotFound("Chat not found")
+            if json.loads(row[0])["status"] != "idle":
+                raise StateConflict("Stop the current task before deleting this chat")
+            db.execute("DELETE FROM chat_messages WHERE chat_id=?", (chat_id,))
+            # Discard access capabilities with the conversation. Built projects, files,
+            # workflows and their audit records are independent owner artifacts.
+            if db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='local_records'"
+            ).fetchone():
+                db.execute(
+                    "DELETE FROM local_records WHERE (bucket='grants' AND id=?) OR "
+                    "(bucket IN ('access_requests','code_revisions') "
+                    "AND json_extract(data,'$.chat_id')=?)",
+                    (chat_id, chat_id),
+                )
+            db.execute("DELETE FROM chats WHERE id=?", (chat_id,))
 
     def find_turn(self, chat_id: str, request_id: str, content: str) -> dict | None:
         with self.builds.connect() as db:
