@@ -8,8 +8,10 @@ import os
 import platform
 import shutil
 import signal
+import subprocess
 import sys
 import tempfile
+import threading
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -33,6 +35,11 @@ class GrantInput(ClosedModel):
     confirm: StrictBool = False
     hours: int = Field(default=4, ge=1, le=24)
     workspace: str | None = None
+
+
+class FolderInput(ClosedModel):
+    parent: str = Field(min_length=1, max_length=2000)
+    name: str = Field(min_length=1, max_length=150)
 
 
 class PathArgs(ClosedModel):
@@ -300,8 +307,11 @@ class Tools:
         if data.mode == "system" and data.confirm is not True:
             raise StateConflict("Explicit owner confirmation is required for system access")
         workspace = Path(data.workspace or self.settings.local_workspace).expanduser().resolve()
-        if data.mode != "off" and not workspace.is_dir():
-            raise StateConflict("Choose an existing local workspace folder")
+        if data.mode != "off":
+            if workspace.is_file():
+                workspace = workspace.parent
+            if not workspace.is_dir():
+                raise StateConflict("Choose an existing local workspace folder")
         record = {
             "chat_id": chat_id,
             "mode": data.mode,
@@ -355,6 +365,122 @@ class Tools:
         ):
             raise StateConflict("Use the connection/settings interface for private state")
         return target
+
+    def browse(self, raw: str | None, hidden: bool = False):
+        """List one real folder so the owner can choose where coding runs."""
+        start = Path(raw).expanduser() if raw else Path.home()
+        try:
+            resolved = start.resolve(strict=False)
+        except (OSError, ValueError) as exc:
+            raise StateConflict("Choose an existing folder") from exc
+        if resolved.is_file():
+            resolved = resolved.parent
+        if not resolved.is_dir():
+            raise StateConflict("Choose an existing folder")
+        try:
+            children = sorted(
+                resolved.iterdir(), key=lambda item: (not item.is_dir(), item.name.casefold())
+            )
+        except OSError as exc:
+            raise StateConflict("Cannot open this folder") from exc
+        entries = []
+        truncated = False
+        for child in children:
+            if len(entries) >= 400:
+                truncated = True
+                break
+            try:
+                directory = child.is_dir()
+                if not directory or (child.name.startswith(".") and not hidden):
+                    continue
+                entries.append({"name": child.name, "directory": True, "path": str(child)})
+            except OSError:
+                continue
+        return {
+            "path": str(resolved),
+            "parent": None if resolved.parent == resolved else str(resolved.parent),
+            "home": str(Path.home()),
+            "entries": entries,
+            "truncated": truncated,
+        }
+
+    def create_folder(self, data: FolderInput):
+        """Owner-only mkdir; creates one child in an explicitly selected existing folder."""
+        name = data.name.strip()
+        if not name or name in {".", ".."} or any(c in name for c in "/\\\x00"):
+            raise StateConflict("Choose a single folder name")
+        try:
+            parent = Path(data.parent).expanduser().resolve()
+        except (OSError, ValueError) as exc:
+            raise StateConflict("Choose an existing folder") from exc
+        if not parent.is_dir():
+            raise StateConflict("Choose an existing folder")
+        path = parent / name
+        try:
+            path.mkdir()
+        except FileExistsError as exc:
+            raise StateConflict("This folder already exists") from exc
+        except OSError as exc:
+            raise StateConflict("Cannot create this folder") from exc
+        self.store.audit("folder.create", "complete")
+        return {"path": str(path)}
+
+    _picker_lock = threading.Lock()
+
+    def pick_folder(self, raw: str | None):
+        if not self._picker_lock.acquire(blocking=False):
+            return {"available": False}
+        try:
+            return self._pick_folder(raw)
+        finally:
+            self._picker_lock.release()
+
+    def _pick_folder(self, raw: str | None):
+        """Open a native folder chooser on the machine running BisCode."""
+        if not shutil.which("zenity"):
+            return {"available": False}
+        start = Path(raw).expanduser() if raw else Path.home()
+        try:
+            if start.is_file():
+                start = start.parent
+            if not start.is_dir():
+                start = Path.home()
+            start = start.resolve()
+        except OSError:
+            start = Path.home()
+        filename = str(start)
+        if not filename.endswith(os.sep):
+            filename += os.sep
+        try:
+            completed = subprocess.run(
+                [
+                    "zenity",
+                    "--file-selection",
+                    "--directory",
+                    "--title=Choose a project folder",
+                    "--filename=" + filename,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=180,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return {"available": False}
+        chosen = completed.stdout.strip()
+        if completed.returncode == 1:
+            return {"available": True, "cancelled": True}
+        if completed.returncode != 0 or not chosen:
+            return {"available": False}
+        path = Path(chosen).expanduser()
+        try:
+            if path.is_file():
+                path = path.parent
+            if not path.is_dir():
+                raise StateConflict("Choose an existing folder")
+            return {"available": True, "cancelled": False, "path": str(path.resolve())}
+        except (OSError, ValueError) as exc:
+            raise StateConflict("Choose an existing folder") from exc
 
     async def call(self, chat_id, name, arguments):
         entry = self.entries.get(name)

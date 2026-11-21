@@ -1,5 +1,6 @@
 """Authenticated owner control plane. Secret entry and grants are never model tools."""
 
+import asyncio
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
@@ -10,7 +11,7 @@ from master_agent.ir import ClosedModel
 from master_agent.local.bridge import BindingInput
 from master_agent.local.connectors import ConnectionInput
 from master_agent.local.native import CatalogEntry, NativeSpec
-from master_agent.local.tools import GrantInput
+from master_agent.local.tools import FolderInput, GrantInput
 from master_agent.repository import StateConflict, now
 
 
@@ -119,6 +120,18 @@ def router(authenticate):
         record.update(status="rejected")
         store.put("access_requests", request_id, record)
         return record
+
+    @routes.get("/browse")
+    async def browse(request: Request, path: str = "", hidden: bool = False):
+        return await asyncio.to_thread(request.app.state.tools.browse, path, hidden)
+
+    @routes.post("/folders", status_code=201)
+    async def create_folder(data: FolderInput, request: Request):
+        return await asyncio.to_thread(request.app.state.tools.create_folder, data)
+
+    @routes.post("/pick-folder")
+    async def pick_folder(request: Request, path: str = ""):
+        return await asyncio.to_thread(request.app.state.tools.pick_folder, path)
 
     @routes.get("/projects")
     async def projects(request: Request, chat_id: str | None = None):

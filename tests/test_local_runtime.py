@@ -594,3 +594,30 @@ def test_english_catalog_keeps_persian_lookup_and_owner_labels(api):
     state.local_store.put("catalog", key, {**original, "label": "گره سفارشی من", "source": "owner"})
     state.catalog.initialize()
     assert state.local_store.get("catalog", key)["label"] == "گره سفارشی من"
+
+
+def test_owner_can_browse_and_grant_a_project_file(api, tmp_path, monkeypatch):
+    project = tmp_path / "codec"
+    project.mkdir()
+    (project / "main.py").write_text("print('ok')\n")
+    (project / "pkg").mkdir()
+    assert api.get("/api/v1/local/browse", headers={"Authorization": ""}).status_code == 401
+    listed = api.get("/api/v1/local/browse", params={"path": str(project)})
+    assert listed.status_code == 200
+    names = {item["name"]: item["directory"] for item in listed.json()["entries"]}
+    assert names == {"pkg": True}
+    assert listed.json()["path"] == str(project.resolve())
+    opened = api.get("/api/v1/local/browse", params={"path": str(project / "main.py")})
+    assert opened.status_code == 200 and opened.json()["path"] == str(project.resolve())
+    missing = api.get("/api/v1/local/browse", params={"path": str(tmp_path / "missing")})
+    assert missing.status_code == 409
+    monkeypatch.setattr("master_agent.local.tools.shutil.which", lambda *_args, **_kwargs: None)
+    picker = api.post("/api/v1/local/pick-folder", params={"path": str(project)})
+    assert picker.status_code == 200 and picker.json()["available"] is False
+    cid = chat(api)
+    chosen = api.put(
+        "/api/v1/local/grants/" + cid,
+        json={"mode": "workspace", "workspace": str(project / "main.py")},
+    )
+    assert chosen.status_code == 200
+    assert chosen.json()["workspace"] == str(project.resolve())
