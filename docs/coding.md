@@ -220,3 +220,30 @@ so an editor opened on the granted folder sees the changes as each write succeed
 Activity is saved with the assistant message and restored on reload; it is an
 execution log, not the model's private reasoning. Terminal output appears after
 the command finishes, while its running state is shown during execution.
+
+## Existing files and unfinished follow-ups
+
+For an implementation/edit request, the controller inspects the granted project
+before asking the model to act. Explicitly named source files are read through
+the normal permission-checked `files.read` tool; the owner need not paste them.
+A uniquely matching nested file can be found within the workspace. Discovery
+skips hidden/environment directories and symlink traversal, is limited to 500
+folders and four requested files, and never expands an access grant. Ambiguous
+matches ask the owner to select an actual path; missing existing files are
+reported explicitly instead of silently creating a replacement agent.
+
+Persian completion/edit verbs and short follow-ups such as «چیشد» or «بنویس»
+retain the unfinished user task. Assistant promises are not completion evidence.
+A verified completion marker prevents a later status question from repeating
+completed edits. Cancellation is respected. A terminal command alone does not
+prove a requested code edit. Workspace-only grants still allow real source edits;
+executing commands/tests requires system access. Necessary requirements questions
+can stop a task after the file was actually read and the reviewer confirms that
+owner input is missing. Finite execution budgets and explicit access boundaries
+remain in effect.
+
+If repeated inspection produces no edits, the controller narrows the next
+available tools to editing the already-read target. It also hides unavailable
+system tools for workspace-only tasks that do not request command execution.
+Final future-tense promises are replaced with a receipt of actual managed file
+changes and test status when the completion review has verified the task.
