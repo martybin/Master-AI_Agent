@@ -2,15 +2,15 @@
 
 import re
 
+WRITE_ACTION = (
+    r"\b(build|create|write|fix|implement|refactor|complete|finish|edit|update|improve|modify|extend|repair|add)\b"
+    r"|بساز|بنویس|پیاده|اصلاح|تغییر بده|قرار بده|بذار|بزار"
+    r"|تکمیل|ویرایش|توسعه|درستش|ادیت|بهبود|کاملش|کامل کن|رفع|بازنویس|درست کن|آپدیت"
+)
+
 
 def coding_action(request):
-    return bool(
-        re.search(
-            r"\b(build|create|write|fix|implement|refactor|run)\b"
-            r"|بساز|بنویس|پیاده|اصلاح|اجرا|تغییر بده|قرار بده|بذار|بزار",
-            request.lower(),
-        )
-    )
+    return bool(re.search(WRITE_ACTION + r"|\brun\b|اجرا", request.lower()))
 
 
 def target_for(chat, request):
@@ -101,35 +101,44 @@ def execution_request(messages):
     """Short continuations retain the last user-authored coding task."""
     latest = messages[-1]["content"]
     if re.search(
-        r"فقط توضیح|فقط بگو|کد ننویس|تغییر نده|explain only|do not (write|edit|change)",
+        r"فقط توضیح|فقط بگو|کد ننویس|تغییر نده|(?:تکمیل|ویرایش|ادامه|اصلاح)\s+نکن"
+        r"|explain only|do not (write|edit|change)|stop|cancel",
         latest.lower(),
     ):
         return None
-    if coding_action(latest):
+    if re.search(r"اجرا\s+نکن|do not run", latest.lower()) and not re.search(
+        WRITE_ACTION, latest.lower()
+    ):
+        return None
+    short = bool(
+        re.fullmatch(r"(?:بنویس|تکمیل کن|ادامه بده|انجام بده|بزن)[؟?! .]*", latest.strip())
+    )
+    if coding_action(latest) and not short:
         return latest
-    if re.search(r"نوشتی|ادامه|انجام بده|قرار بده|بذار|بزار|continue|do it", latest.lower()):
-        return next(
-            (
-                m["content"]
-                for m in reversed(messages)
-                if m["role"] == "user" and coding_action(m["content"])
-            ),
-            latest,
-        )
+    if short or re.search(
+        r"نوشتی|چی\s*شد|چیشد|ادامه|انجام بده|پوشه|فولدر|دسترسی|همین|continue|do it|what happened",
+        latest.lower(),
+    ):
+        for i in range(len(messages) - 2, -1, -1):
+            m = messages[i]
+            if m["role"] == "user" and coding_action(m["content"]):
+                replies = [r for r in messages[i + 1 :] if r["role"] == "assistant"]
+                if replies and (
+                    replies[-1].get("execution_complete")
+                    or replies[-1].get("error_code") == "interrupted"
+                ):
+                    return None
+                return m["content"]
+        return latest if short else None
     return None
 
 
 def missing_execution(request, observations):
     """A fluent reply or a read cannot count as implementing an explicit edit."""
-    writes = bool(
-        re.search(
-            r"write|create|build|implement|fix|refactor|بنویس|بساز|پیاده|اصلاح|قرار بده|بذار|بزار",
-            request.lower(),
-        )
-    )
+    writes = bool(re.search(WRITE_ACTION, request.lower()))
     successful = [o for o in observations if "result" in o and not o.get("error")]
     required = (
-        {"code.write_file", "code.replace", "project.create_python_agent", "terminal.exec"}
+        {"code.write_file", "code.replace", "project.create_python_agent"}
         if writes
         else {"terminal.exec", "code.check", "project.check"}
     )
@@ -149,7 +158,10 @@ def missing_execution(request, observations):
     if not performed:
         return True
     needs_tests = bool(re.search(r"\btests\b|\bunittest\b|تست|آزمایش", request.lower()))
-    if needs_tests and not re.search(r"بدون تست|بدون آزمایش|no tests", request.lower()):
+    if needs_tests and not re.search(
+        r"بدون تست|بدون آزمایش|no tests|(?:تست|فرمان).{0,18}اجرا نکن|do not run tests",
+        request.lower(),
+    ):
         last_write = max(
             (
                 i

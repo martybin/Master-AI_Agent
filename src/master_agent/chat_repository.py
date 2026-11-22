@@ -224,6 +224,7 @@ class ChatRepository:
         project_id: str | None = None,
         access_request: dict | None = None,
         ui_notice: str | None = None,
+        execution_complete: bool = False,
     ) -> dict:
         with self.builds.connect() as db:
             db.execute("BEGIN IMMEDIATE")
@@ -241,6 +242,7 @@ class ChatRepository:
                 project_id=project_id,
                 access_request=access_request,
                 ui_notice=ui_notice,
+                execution_complete=execution_complete,
             )
             db.execute(
                 "UPDATE chat_messages SET data=? WHERE id=?", (json.dumps(message), message_id)

@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import re
 from collections.abc import Callable
 from typing import Any, Literal
 
@@ -10,6 +11,7 @@ from pydantic import Field, ValidationError
 
 from master_agent.chat_repository import ChatRepository
 from master_agent.clients import IntegrationError, OllamaClient
+from master_agent.coding_context import inspect_task, named_files
 from master_agent.coding_policy import (
     decision_schema,
     execution_request,
@@ -108,6 +110,22 @@ class ChatService:
         coding = target in {"python", "code"}
         manifest = self.tools.manifest(target) if self.tools else []
         if coding:
+            grant = self.tools.permission(chat_id)
+            checks_requested = bool(
+                re.search(
+                    r"\brun\b|\btests?\b(?!\.)|اجرا|تست|آزمایش", messages[-1]["content"].lower()
+                )
+                and not re.search(
+                    r"اجرا\s+نکن|بدون تست|no tests|do not run", messages[-1]["content"].lower()
+                )
+            )
+            if grant["mode"] == "workspace":
+                manifest = [
+                    e
+                    for e in manifest
+                    if e["scope"] != "system"
+                    and (e["name"] != "access.request" or checks_requested)
+                ]
             inspected = any(
                 o.get("tool") in {"files.list", "project.inspect"} and "result" in o
                 for o in observations or []
@@ -122,6 +140,32 @@ class ChatService:
                 and not (inspected and e["name"] in {"files.list", "project.inspect"})
                 and not (used_system and e["name"] == "system.inspect")
             ]
+            if any(o.get("tool") == "files.read" and "result" in o for o in observations or []):
+                manifest = [e for e in manifest if e["name"] != "project.create_python_agent"]
+            intent = execution_request(messages)
+            if intent and observations:
+                changes = {"code.write_file", "code.replace", "project.create_python_agent"}
+                changed = any(o.get("tool") in changes and "result" in o for o in observations)
+                reads = [o for o in observations if o.get("tool") in READ_ONLY_TOOLS]
+                if not changed and len(reads) >= 4:
+                    manifest = [
+                        e
+                        for e in manifest
+                        if e["name"] in {"code.write_file", "code.replace", "access.request"}
+                    ]
+                    targets = named_files(intent)
+                    read_paths = [
+                        o["result"].get("path")
+                        for o in reads
+                        if o.get("tool") == "files.read" and "result" in o
+                    ]
+                    if len(targets) == 1 and read_paths:
+                        for entry in manifest:
+                            if entry["name"] in {"code.write_file", "code.replace"}:
+                                entry["parameters"]["properties"]["path"] = {
+                                    "type": "string",
+                                    "const": read_paths[0],
+                                }
             if observations and observations[-1].get("reused"):
                 manifest = [e for e in manifest if e["name"] != observations[-1]["tool"]]
                 force_tool = True
@@ -130,6 +174,10 @@ class ChatService:
                 force_tool = True
             system = (
                 "You are BisCode, a Persian-speaking local coding agent and agent builder. "
+                "Real files.read observations contain the granted on-disk source; "
+                "never ask the owner to paste a file already read. "
+                "Respect the existing architecture when editing an existing file. "
+                "Framework defaults apply only when creating a new AI agent. "
                 "For Python agents use LangGraph as the default base, LangChain for "
                 "agent/model/tool integrations and LlamaIndex for indexing/RAG where "
                 "appropriate. Consult retrieved official docs; do not force all three "
@@ -417,6 +465,7 @@ class ChatService:
 
         project_id, pending_access = None, None
         coding, turn_started = False, None
+        completion_verified = False
         try:
             emit({"type": "stage", "stage": "thinking"})
             chat = self.history.get(chat_id)
@@ -473,6 +522,31 @@ class ChatService:
                 emit({"type": "permission_required", "access_request": pending_access})
                 emit({"type": "complete", "message": message, "build": None})
                 return
+            if task and self.tools.permission(chat_id)["mode"] != "off":
+                inspected, blocker = await inspect_task(self.tools, chat_id, task, emit)
+                observations.extend(inspected)
+                force_tool = not any(
+                    o.get("tool") == "files.read" and "result" in o for o in inspected
+                )
+                for item in inspected:
+                    if "result" in item:
+                        read_results.add(
+                            (
+                                item["tool"],
+                                json.dumps(item["arguments"], sort_keys=True, ensure_ascii=False),
+                            )
+                        )
+                if blocker:
+                    message = self.history.finish_turn(chat_id, assistant_id, blocker)
+                    emit({"type": "complete", "message": message, "build": None})
+                    return
+                messages = [
+                    *messages[:-1],
+                    {
+                        **messages[-1],
+                        "content": task + "\nLatest owner message: " + messages[-1]["content"],
+                    },
+                ]
             # Personal-contact birthdays have mandatory inputs; surface them even
             # when a small model would repeatedly rediscover the empty registry.
             if self.tools and not coding and personal_birthday_request(messages[-1]["content"]):
@@ -502,6 +576,29 @@ class ChatService:
                 )
                 force_tool = False
                 if decision.action == "reply" and task and missing_execution(task, observations):
+                    has_read = any(
+                        o.get("tool") == "files.read" and "result" in o for o in observations
+                    )
+                    asks_requirements = re.search(
+                        r"چه قابلیت|چه تغییری|منظورت|مشخص کن|which feature|what behavior",
+                        decision.message.lower(),
+                    )
+                    asks_upload = re.search(
+                        r"بفرست|ارسال کن|نمی.بینم|paste|upload|send.*file", decision.message.lower()
+                    )
+                    if has_read and asks_requirements and not asks_upload:
+                        emit({"type": "stage", "stage": "checking_tools"})
+                        review = await self.review_completion(task, observations)
+                        if review.status == "blocked":
+                            paths = [
+                                o["result"].get("path", "")
+                                for o in observations
+                                if o.get("tool") == "files.read" and "result" in o
+                            ]
+                            decision.message = (
+                                "Inspected: " + ", ".join(paths) + "\n" + decision.message
+                            )
+                            break
                     observations.append(
                         {
                             "tool": "completion.review",
@@ -517,7 +614,7 @@ class ChatService:
                     force_tool = True
                     continue
                 if decision.action == "reply" and observations:
-                    if coding and project_id:
+                    if coding and project_id and self.tools.permission(chat_id)["mode"] == "system":
                         runs = [
                             r
                             for r in self.tools.store.list("code_runs")
@@ -549,6 +646,7 @@ class ChatService:
                         )
                         force_tool = True
                         continue
+                    completion_verified = review.status == "complete"
                     if review.status == "blocked":
                         decision.message = "The task is not complete yet. " + "; ".join(
                             review.missing
@@ -824,6 +922,20 @@ class ChatService:
                 )
             else:
                 content = decision.message
+                if (
+                    coding
+                    and task
+                    and completion_verified
+                    and not pending_access
+                    and re.search(
+                        r"(?:حالا|بعداً|بعدا|سپس).*(?:می.?کنم|می.?نویسم|می.?خوانم)|\bI will\b|I'll",
+                        content,
+                        re.DOTALL,
+                    )
+                ):
+                    content = "ویرایش‌های این نوبت روی دیسک ذخیره شدند." + self.coding_progress(
+                        chat_id, turn_started
+                    )
             message = self.history.finish_turn(
                 chat_id,
                 assistant_id,
@@ -832,6 +944,13 @@ class ChatService:
                 title=build["ir"]["name"] if build else None,
                 project_id=project_id,
                 access_request=pending_access,
+                execution_complete=bool(
+                    coding
+                    and task
+                    and completion_verified
+                    and not missing_execution(task, observations)
+                    and not pending_access
+                ),
             )
             emit(
                 {
