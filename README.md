@@ -36,6 +36,18 @@ Switch the interface between English and Persian from the top bar; the choice is
 saved in this browser, with RTL layout for Persian. **The model's Persian
 instructions and multilingual input support are preserved**. Persian messages retain their natural text direction.
 
+## Documentation RAG
+
+Python agent building retrieves official LangChain, LangGraph and LlamaIndex
+references; n8n building retrieves n8n documentation. New Python agents start
+with LangGraph. General local coding does not receive automatic RAG context.
+Use **Getting started → Official documentation · RAG** to inspect and update the
+local corpus, or run `uv run biscode docs sync`. Retrieval uses local SQLite
+FTS5/BM25 without an additional embedding model or GPU allocation.
+
+See [documentation retrieval](docs/knowledge.md) for scope, source dates, offline
+operation, configuration, and limitations.
+
 ## Quick start
 
 ### Requirements
@@ -51,6 +63,7 @@ Run these commands from the repository root:
 ```bash
 uv sync --frozen --group dev
 uv run python scripts/bootstrap.py
+uv run biscode docs sync
 ollama pull qwen3.5:9b
 mkdir -p work/projects
 uv run biscode serve --workspace "$PWD/work/projects"

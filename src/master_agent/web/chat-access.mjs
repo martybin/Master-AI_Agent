@@ -1,4 +1,4 @@
-import { setText, msg } from "./i18n.mjs?v=0.4.4";
+import { setText, msg } from "./i18n.mjs?v=0.5.0";
 export function mountChatAccess({ api, state, picker, ensureChat, showError }) {
   const $ = (id) => document.getElementById(id);
   let generation = 0;

@@ -1,5 +1,6 @@
-import { mountChatAccess } from "./chat-access.mjs?v=0.4.4";
-import { mountFolderPicker } from "./folder-picker.mjs?v=0.4.4";
+import { mountKnowledge } from "./knowledge-ui.mjs?v=0.5.0";
+import { mountChatAccess } from "./chat-access.mjs?v=0.5.0";
+import { mountFolderPicker } from "./folder-picker.mjs?v=0.5.0";
 import {
   initializeLanguage,
   setText,
@@ -8,9 +9,9 @@ import {
   msg,
   number,
   dateTime,
-} from "./i18n.mjs?v=0.4.4";
-import { mountLocalAgent } from "./local-ui.mjs?v=0.4.4";
-import { mountCoding } from "./coding-ui.mjs?v=0.4.4";
+} from "./i18n.mjs?v=0.5.0";
+import { mountLocalAgent } from "./local-ui.mjs?v=0.5.0";
+import { mountCoding } from "./coding-ui.mjs?v=0.5.0";
 import {
   statuses,
   nodeKinds,
@@ -19,7 +20,7 @@ import {
   EventParser,
   errorMessage,
   nodeDetail,
-} from "./ui-utils.mjs?v=0.4.4";
+} from "./ui-utils.mjs?v=0.5.0";
 
 const $ = (id) => document.getElementById(id);
 const shapes = {
@@ -443,6 +444,23 @@ function renderMessages() {
       renderMarkdown(content, message.content);
     else content.textContent = message.content;
     body.append(content);
+    if (message.sources?.length) {
+      const references = el("details", "turn-activity");
+      references.append(el("summary", "", "Retrieved official references"));
+      for (const source of message.sources) {
+        const link = el(
+          "a",
+          "reference-link",
+          `${source.family}: ${source.title}`,
+          false,
+        );
+        link.href = source.url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        references.append(link);
+      }
+      body.append(references);
+    }
     if (message.activity?.length) {
       const activity = el("details", "turn-activity");
       activity.open = message.status === "pending";
@@ -1598,5 +1616,6 @@ $("send-button").addEventListener("click", async (event) => {
     if (state.busy) $("send-button").disabled = false;
   }
 });
+mountKnowledge({ api, state, el, showError, toast });
 initializeLanguage();
 boot();

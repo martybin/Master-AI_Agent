@@ -1,5 +1,21 @@
 // Developer-owned UI copy. Never translate chat messages, code, or user names.
 export const fa = {
+  "Official documentation · RAG": "مستندات رسمی · RAG",
+  "Python agents use LangChain, LangGraph and LlamaIndex references. n8n uses its own documentation. General coding has no automatic documentation retrieval.":
+    "ایجنت‌های پایتون از منابع LangChain، LangGraph و LlamaIndex استفاده می‌کنند. n8n مستندات خودش را دارد. کدنویسی عمومی بازیابی خودکار مستندات ندارد.",
+  "Connect your workspace to manage documentation.":
+    "برای مدیریت مستندات به فضای کاری متصل شو.",
+  "Documentation retrieval is disabled.": "بازیابی مستندات غیرفعال است.",
+  "Update official documentation": "به‌روزرسانی مستندات رسمی",
+  "Indexed sources & sync dates": "منابع ایندکس‌شده و تاریخ همگام‌سازی",
+  "{pages} pages · {chunks} passages · local BM25 retrieval":
+    "{pages} صفحه · {chunks} قطعه · بازیابی محلی BM25",
+  "Synchronizing official documentation…": "در حال همگام‌سازی مستندات رسمی…",
+  "{count} documentation pages could not be updated. Previous copies were kept.":
+    "به‌روزرسانی {count} صفحه ناموفق بود. نسخه‌های قبلی نگه داشته شدند.",
+  "Official documentation synchronized.": "مستندات رسمی همگام‌سازی شدند.",
+  "Retrieved official references": "منابع رسمی بازیابی‌شده",
+  "Retrieving official documentation…": "در حال بازیابی مستندات رسمی…",
   "Project folder & access": "پوشهٔ پروژه و دسترسی",
   "Choose a project folder": "یک پوشهٔ پروژه انتخاب کن",
   "Choose folder": "انتخاب پوشه",

@@ -1,4 +1,4 @@
-import { setText, msg, number } from "./i18n.mjs?v=0.4.4";
+import { setText, msg, number } from "./i18n.mjs?v=0.5.0";
 // Owner controls: no page/model text can approve a permission request.
 export function mountCoding({
   api,

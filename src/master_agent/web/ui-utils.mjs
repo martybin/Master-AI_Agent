@@ -19,6 +19,7 @@ export const nodeKinds = {
   respond: ["Respond", "check"],
 };
 export const stageLabels = {
+  retrieving_docs: "Retrieving official documentation…",
   checking_tools: "Checking results…",
   tool_running: "Running a local tool…",
   thinking: "Thinking through your request…",

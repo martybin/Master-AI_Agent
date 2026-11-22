@@ -10,8 +10,8 @@
     />
     <title>BisCode — Local AI Agent Builder</title>
     <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/assets/app.css?v=0.4.4" />
-    <script type="module" src="/assets/app.js?v=0.4.4"></script>
+    <link rel="stylesheet" href="/assets/app.css?v=0.5.0" />
+    <script type="module" src="/assets/app.js?v=0.5.0"></script>
   </head>
   <body>
     <a class="skip-link" href="#prompt">Skip to message input</a>
@@ -430,6 +430,24 @@
           </p>
         </article>
       </div>
+      <section class="help-note">
+        <h3>Official documentation · RAG</h3>
+        <p>
+          Python agents use LangChain, LangGraph and LlamaIndex references. n8n
+          uses its own documentation. General coding has no automatic
+          documentation retrieval.
+        </p>
+        <p id="docs-status" role="status">
+          Connect your workspace to manage documentation.
+        </p>
+        <button id="docs-sync" type="button" class="secondary-button">
+          Update official documentation
+        </button>
+        <details>
+          <summary>Indexed sources & sync dates</summary>
+          <div id="docs-sources"></div>
+        </details>
+      </section>
       <div class="help-note">
         <strong>Connect n8n</strong>
         <p>

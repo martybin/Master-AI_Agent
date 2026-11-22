@@ -2644,3 +2644,18 @@ html[dir="rtl"] :is(.new-chat, .local-tabs, .local-form-grid) {
   overflow: auto;
   white-space: pre-wrap;
 }
+.reference-link {
+  display: block;
+  overflow-wrap: anywhere;
+  margin: 6px 0;
+  color: var(--mint);
+}
+#docs-sources {
+  max-height: 260px;
+  overflow: auto;
+}
+#docs-sources small {
+  display: block;
+  direction: ltr;
+  unicode-bidi: isolate;
+}

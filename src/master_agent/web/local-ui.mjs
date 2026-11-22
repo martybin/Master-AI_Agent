@@ -1,6 +1,6 @@
-import { setText, msg, dateTime, number } from "./i18n.mjs?v=0.4.4";
+import { setText, msg, dateTime, number } from "./i18n.mjs?v=0.5.0";
 // Owner-only connection and local capability controls. Secrets never enter chat history.
-import { statuses } from "./ui-utils.mjs?v=0.4.4";
+import { statuses } from "./ui-utils.mjs?v=0.5.0";
 
 export function mountLocalAgent({
   api,

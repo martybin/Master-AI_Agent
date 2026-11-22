@@ -1,4 +1,4 @@
-import { fa } from "./translations-fa.mjs?v=0.4.4";
+import { fa } from "./translations-fa.mjs?v=0.5.0";
 
 export const LANGUAGE_KEY = "biscode-language";
 let language = "en";
