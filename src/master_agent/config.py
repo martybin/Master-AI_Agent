@@ -8,6 +8,19 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", validate_assignment=True)
 
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls,
+        init_settings,
+        env_settings,
+        dotenv_settings,
+        file_secret_settings,
+    ):
+        # The project .env is what the owner edits. A shell that still exports an
+        # older OLLAMA_MODEL must not keep that stale value after the file changes.
+        return init_settings, dotenv_settings, env_settings, file_secret_settings
+
     master_api_key: SecretStr = SecretStr("")
     database_path: Path = Path("data/master-agent.sqlite3")
     ollama_base_url: str = "http://127.0.0.1:11434"

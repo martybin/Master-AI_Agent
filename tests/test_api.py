@@ -209,3 +209,13 @@ def test_configuration_without_n8n_key_still_builds(settings, network, ir):
         assert api.post(f"/api/v1/builds/{record['id']}/deploy").status_code == 503
         assert api.get(f"/api/v1/builds/{record['id']}").json()["status"] == "draft"
         assert not network.calls
+
+
+def test_project_env_overrides_stale_shell_model(monkeypatch, tmp_path):
+    env_file = tmp_path / ".env"
+    env_file.write_text("OLLAMA_MODEL=mimo-v2.6:9b\n")
+    monkeypatch.setenv("OLLAMA_MODEL", "qwen3.5:9b")
+    from master_agent.config import Settings
+
+    assert Settings(_env_file=env_file).ollama_model == "mimo-v2.6:9b"
+    assert Settings(_env_file=env_file, ollama_model="explicit:1").ollama_model == "explicit:1"

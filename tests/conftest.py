@@ -24,6 +24,7 @@ def settings(tmp_path):
         _env_file=None,
         master_api_key=API_KEY,
         n8n_api_key="test-n8n-secret",
+        ollama_model="qwen3.5:9b",
         database_path=tmp_path / "test.sqlite3",
         http_allowed_hosts=["httpbin.org"],
     )
