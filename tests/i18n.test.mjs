@@ -10,8 +10,8 @@ import {
   setText,
   setAttr,
   LANGUAGE_KEY,
-} from "../src/master_agent/web/i18n.mjs?v=0.4.3";
-import { fa } from "../src/master_agent/web/translations-fa.mjs?v=0.4.3";
+} from "../src/master_agent/web/i18n.mjs?v=0.4.4";
+import { fa } from "../src/master_agent/web/translations-fa.mjs?v=0.4.4";
 
 function element() {
   return {

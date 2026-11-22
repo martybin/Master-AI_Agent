@@ -67,6 +67,11 @@ def router(authenticate):
     async def tools(request: Request):
         return {"tools": request.app.state.tools.manifest()}
 
+    @routes.get("/grants/{chat_id}")
+    async def get_grant(chat_id: str, request: Request):
+        request.app.state.history.get(chat_id)
+        return request.app.state.tools.permission(chat_id)
+
     @routes.put("/grants/{chat_id}")
     async def grant(chat_id: str, data: GrantInput, request: Request):
         request.app.state.history.get(chat_id)

@@ -1,4 +1,5 @@
-import { mountFolderPicker } from "./folder-picker.mjs?v=0.4.3";
+import { mountChatAccess } from "./chat-access.mjs?v=0.4.4";
+import { mountFolderPicker } from "./folder-picker.mjs?v=0.4.4";
 import {
   initializeLanguage,
   setText,
@@ -7,9 +8,9 @@ import {
   msg,
   number,
   dateTime,
-} from "./i18n.mjs?v=0.4.3";
-import { mountLocalAgent } from "./local-ui.mjs?v=0.4.3";
-import { mountCoding } from "./coding-ui.mjs?v=0.4.3";
+} from "./i18n.mjs?v=0.4.4";
+import { mountLocalAgent } from "./local-ui.mjs?v=0.4.4";
+import { mountCoding } from "./coding-ui.mjs?v=0.4.4";
 import {
   statuses,
   nodeKinds,
@@ -18,7 +19,7 @@ import {
   EventParser,
   errorMessage,
   nodeDetail,
-} from "./ui-utils.mjs?v=0.4.3";
+} from "./ui-utils.mjs?v=0.4.4";
 
 const $ = (id) => document.getElementById(id);
 const shapes = {
@@ -137,7 +138,7 @@ const state = {
   streamController: null,
   deletingChat: null,
 };
-let toastTimer, elapsedTimer, pollTimer, codingUI;
+let toastTimer, elapsedTimer, pollTimer, codingUI, chatAccess;
 const formatNumber = number;
 const time = (value) => dateTime(value, { hour: "2-digit", minute: "2-digit" });
 function toast(text) {
@@ -199,6 +200,7 @@ function renderSendButton(busy) {
 }
 function setBusy(busy) {
   state.busy = busy;
+  chatAccess?.busy(busy);
   renderSendButton(busy);
   $("build-target").disabled = busy;
   $("build-progress").hidden = !busy;
@@ -348,6 +350,7 @@ async function refreshLists() {
   renderHistory();
 }
 function newChat() {
+  chatAccess?.reset();
   clearTimeout(pollTimer);
   state.chat = null;
   state.selectedBuild = null;
@@ -364,6 +367,7 @@ function newChat() {
 async function loadChat(id) {
   const chat = await api(`/chats/${encodeURIComponent(id)}`);
   state.chat = chat;
+  chatAccess?.refresh().catch(showError);
   $("build-target").value = chat.target || "auto";
   safelyStore("master-chat", id);
   setText($("chat-title"), chat.title, false);
@@ -439,6 +443,36 @@ function renderMessages() {
       renderMarkdown(content, message.content);
     else content.textContent = message.content;
     body.append(content);
+    if (message.activity?.length) {
+      const activity = el("details", "turn-activity");
+      activity.open = message.status === "pending";
+      activity.append(el("summary", "", "Execution activity"));
+      for (const event of message.activity) {
+        const row = el("div", "activity-row");
+        row.append(
+          el(
+            "span",
+            "",
+            event.type === "stage"
+              ? event.tool
+                ? msg("Running tool: {tool}", { tool: event.tool })
+                : stageLabels[event.stage] || stageLabels.thinking
+              : msg("{tool} · {status}", {
+                  tool: event.name,
+                  status: msg(
+                    event.status === "complete" ? "Complete" : "Failed",
+                  ),
+                }),
+          ),
+        );
+        if (event.path)
+          row.append(el("code", "coding-path", event.path, false));
+        if (event.output)
+          row.append(el("pre", "coding-output", event.output, false));
+        activity.append(row);
+      }
+      body.append(activity);
+    }
     codingUI?.renderMessage(message, body);
     if (message.build_id) {
       const summary = state.builds.find(
@@ -1145,7 +1179,13 @@ async function submit(event, resume = null) {
       } else if (event.type === "permission_required") {
         pendingAccess = event.access_request;
         setText($("progress-label"), "Waiting for your access approval…");
-      } else if (event.type === "stage") {
+      } else if (event.type === "stage" || event.type === "tool") {
+        const running = state.chat?.messages.find((m) => m.id === assistantId);
+        if (running) {
+          running.activity = [...(running.activity || []), event].slice(-100);
+          renderMessages();
+        }
+        if (event.type === "tool") return;
         setStage(event.stage, event.attempt);
         if (event.tool)
           setText(
@@ -1504,7 +1544,34 @@ codingUI = mountCoding({
     await submit(null, { ...record, content: original.content });
   },
 });
-mountFolderPicker({ api, el, button, showDialog, toast, requireConnection });
+const picker = mountFolderPicker({
+  api,
+  el,
+  button,
+  showDialog,
+  toast,
+  requireConnection,
+});
+chatAccess = mountChatAccess({
+  api,
+  state,
+  picker,
+  showError,
+  ensureChat: async () => {
+    if (!requireConnection()) throw new Error("session_changed");
+    if (!state.chat) {
+      state.chat = await api("/chats", {
+        method: "POST",
+        body: JSON.stringify({ target: $("build-target").value }),
+      });
+      safelyStore("master-chat", state.chat.id);
+      const created = state.chat;
+      await refreshLists();
+      return created;
+    }
+    return state.chat;
+  },
+});
 $("build-target").addEventListener("change", async () => {
   if (!state.chat || !state.key) return;
   try {

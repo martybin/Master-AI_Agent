@@ -10,8 +10,8 @@
     />
     <title>BisCode — Local AI Agent Builder</title>
     <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/assets/app.css?v=0.4.3" />
-    <script type="module" src="/assets/app.js?v=0.4.3"></script>
+    <link rel="stylesheet" href="/assets/app.css?v=0.4.4" />
+    <script type="module" src="/assets/app.js?v=0.4.4"></script>
   </head>
   <body>
     <a class="skip-link" href="#prompt">Skip to message input</a>
@@ -190,6 +190,47 @@
             ><span id="progress-label">Thinking through your request…</span
             ><span class="elapsed" id="elapsed">0:00</span>
           </div>
+          <details class="chat-workspace-controls">
+            <summary>
+              Project folder & access <span id="chat-access-status"></span>
+            </summary>
+            <form id="chat-access-form">
+              <div class="path-field">
+                <input
+                  aria-label="Project folder"
+                  id="chat-folder"
+                  dir="ltr"
+                  placeholder="Choose a project folder"
+                  readonly
+                /><button
+                  type="button"
+                  id="chat-browse"
+                  class="secondary-button"
+                >
+                  Choose folder
+                </button>
+              </div>
+              <label for="chat-scope">Coding access</label>
+              <select id="chat-scope">
+                <option value="off">Access off</option>
+                <option value="workspace">Project files only</option>
+                <option value="system">Full access · current OS user</option>
+              </select>
+              <label class="check-label"
+                ><input id="chat-consent" type="checkbox" /><span
+                  >I approve this folder and access for 4 hours. Full access
+                  runs commands as my OS user, outside a sandbox.</span
+                ></label
+              >
+              <button
+                id="chat-access-save"
+                class="secondary-button"
+                type="submit"
+              >
+                Apply access
+              </button>
+            </form>
+          </details>
           <form class="composer" id="composer">
             <label class="sr-only" for="prompt">Message BisCode</label>
             <textarea

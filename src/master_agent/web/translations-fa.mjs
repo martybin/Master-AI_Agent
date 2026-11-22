@@ -1,5 +1,18 @@
 // Developer-owned UI copy. Never translate chat messages, code, or user names.
 export const fa = {
+  "Project folder & access": "پوشهٔ پروژه و دسترسی",
+  "Choose a project folder": "یک پوشهٔ پروژه انتخاب کن",
+  "Choose folder": "انتخاب پوشه",
+  "Coding access": "دسترسی کدنویسی",
+  "Access off": "دسترسی خاموش",
+  "Project files only": "فقط فایل‌های پروژه",
+  "Full access · current OS user": "دسترسی کامل · کاربر فعلی سیستم",
+  "I approve this folder and access for 4 hours. Full access runs commands as my OS user, outside a sandbox.":
+    "این پوشه و سطح دسترسی را برای ۴ ساعت تأیید می‌کنم. دسترسی کامل، فرمان‌ها را با کاربر سیستم و خارج از سندباکس اجرا می‌کند.",
+  "Apply access": "اعمال دسترسی",
+  "Granted: {scope}": "دسترسی فعال: {scope}",
+  "Execution activity": "مراحل اجرای کار",
+  "{tool} · {status}": "{tool} · {status}",
   "Create or edit code and run checks in your chosen folder":
     "ساخت یا ویرایش کد و اجرای بررسی‌ها در پوشهٔ انتخابی تو",
   "Review and approve the folder and scope before local coding. Select Approve & continue to resume this request.":

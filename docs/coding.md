@@ -198,3 +198,25 @@ Owner-only folder endpoints (not available as model tools):
   an existing parent. Rejects path separators, traversal, and existing names.
 
 All require the owner key. They do not modify chat grants or approve requests.
+
+## In-chat coding controls and execution timeline
+
+The composer has **Project folder & access** controls. Choose a folder, select
+**Project files only** or **Full access · current OS user**, check the consent,
+and apply it for this chat. Full access includes terminal commands under the
+current OS user; it does not grant root. Access still expires after four hours.
+The Local Agent panel remains available for integrations and advanced controls.
+
+File-targeted `.py` requests use local coding rather than generating a new AI
+agent template. Short continuations retain the coding context. Implementation
+requests cannot finish with only a promise or a successful inspection; the
+controller requires execution evidence and continues the same turn. A bounded
+step/time budget still applies, and failures report partial work rather than
+claiming completion. Model quality can still affect implementation correctness.
+
+**Execution activity** shows real thinking stages, tool start/completion, paths,
+and bounded redacted terminal/test output. File tools write to disk immediately,
+so an editor opened on the granted folder sees the changes as each write succeeds.
+Activity is saved with the assistant message and restored on reload; it is an
+execution log, not the model's private reasoning. Terminal output appears after
+the command finishes, while its running state is shown during execution.

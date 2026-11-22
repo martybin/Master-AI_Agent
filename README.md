@@ -132,6 +132,10 @@ activate a workflow if the confirmation is missing or incorrect.
 
 ## Local coding
 
+Open **Project folder & access** above the message box to choose a project and
+apply file access or **Full access · current OS user** directly in the chat.
+The execution timeline shows actual tool runs, file paths, and terminal results.
+
 Choose **Python agent** for a new AI agent, or **Local coding** for scripts,
 libraries, and changes to an existing project. n8n remains the default for agent
 requests in Auto mode; explicit Python and coding requests can use the coding path.

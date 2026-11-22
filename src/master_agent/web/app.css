@@ -2602,3 +2602,45 @@ html[dir="rtl"] :is(.dialog-intro, .service-detail, .check-label) {
 html[dir="rtl"] :is(.new-chat, .local-tabs, .local-form-grid) {
   direction: rtl;
 }
+.chat-workspace-controls {
+  margin: 0 auto 8px;
+  max-width: 744px;
+  font-size: 13px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 12px;
+  max-height: 38vh;
+  overflow: auto;
+}
+.chat-workspace-controls summary {
+  cursor: pointer;
+}
+#chat-access-status {
+  color: var(--mint);
+  margin-inline-start: 12px;
+}
+#chat-access-form {
+  padding-top: 10px;
+}
+#chat-access-form select {
+  width: 100%;
+}
+.turn-activity {
+  margin: 10px 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 12px;
+}
+.activity-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.activity-row pre {
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
