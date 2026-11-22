@@ -11,7 +11,7 @@ Ollama runs the model on your machine; no paid model API key is required.
 
 ![BisCode workspace with Persian interface selected](docs/images/biscode-workspace-bilingual.jpg)
 
-[Quick start](#quick-start) · [Connect n8n](#connect-n8n) ·
+[راهنمای اجرای فارسی](HOWTORUN.md) · [Quick start](#quick-start) · [Connect n8n](#connect-n8n) ·
 [Local coding](#local-coding) · [Configuration](#configuration) ·
 [Development](#development) · [Architecture](docs/architecture.md)
 
