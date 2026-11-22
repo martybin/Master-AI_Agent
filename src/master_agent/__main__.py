@@ -17,11 +17,37 @@ def main():
     serve.add_argument("--workspace", type=Path)
     serve.add_argument("--port", type=int, default=8000)
     sub.add_parser("doctor", help="Check model, n8n authentication and Docker")
+    docs = sub.add_parser("docs", help="Manage local official documentation retrieval")
+    docs.add_argument("action", choices=["sync", "status", "search"])
+    docs.add_argument("--family", choices=["langchain", "langgraph", "llamaindex", "n8n"])
+    docs.add_argument("--target", choices=["python", "n8n"], default="python")
+    docs.add_argument("--query", default="agent tools ollama")
     args = parser.parse_args()
     from master_agent.config import Settings
 
     settings = Settings()
-    if args.command == "serve":
+    if args.command == "docs":
+        from master_agent.knowledge.store import Knowledge
+
+        knowledge = Knowledge(
+            settings.knowledge_path or settings.database_path.parent / "knowledge.sqlite3"
+        )
+        if args.action == "sync":
+            import httpx
+
+            async def sync():
+                async with httpx.AsyncClient(trust_env=False, follow_redirects=False) as client:
+                    return await knowledge.sync(client, args.family)
+
+            result = asyncio.run(sync())
+        else:
+            result = (
+                knowledge.status()
+                if args.action == "status"
+                else knowledge.search(args.query, args.target)
+            )
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    elif args.command == "serve":
         import uvicorn
 
         from master_agent.api import create_app

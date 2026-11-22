@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     n8n_ollama_base_url: str = "http://127.0.0.1:11434"
     http_allowed_hosts: list[str] = Field(default_factory=list)
     workflow_timezone: str = "Asia/Tehran"
+    docs_enabled: bool = True
+    knowledge_path: Path | None = None
     local_workspace: Path = Field(default_factory=Path.cwd)
     local_vault_key: Path | None = None
     local_max_steps: int = Field(default=10, ge=1, le=40)

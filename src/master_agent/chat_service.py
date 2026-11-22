@@ -130,6 +130,10 @@ class ChatService:
                 force_tool = True
             system = (
                 "You are BisCode, a Persian-speaking local coding agent and agent builder. "
+                "For Python agents use LangGraph as the default base, LangChain for "
+                "agent/model/tool integrations and LlamaIndex for indexing/RAG where "
+                "appropriate. Consult retrieved official docs; do not force all three "
+                "into ordinary scripts. "
                 "The owner chose Python/local code, NOT n8n for this task. Return structured "
                 "JSON only. action=tool performs one real tool; action=reply explains or asks "
                 "a necessary question. Never use action=build or create an n8n workflow in "
@@ -244,6 +248,17 @@ class ChatService:
                         "action. These observations only prove what their tools actually did; "
                         "system.inspect never writes files or executes commands. "
                         "Original request: " + messages[-1]["content"],
+                    }
+                )
+        if self.tools and self.tools.knowledge and target != "code":
+            evidence, _ = self.tools.knowledge.context(messages[-1]["content"], target)
+            if evidence:
+                turns.append(
+                    {
+                        "role": "user",
+                        "content": evidence
+                        + "\nOriginal owner request to satisfy: "
+                        + messages[-1]["content"],
                     }
                 )
         schema = ChatDecision.model_json_schema()
@@ -421,6 +436,12 @@ class ChatService:
                 (m["build_id"] for m in reversed(messages) if m.get("build_id")), None
             )
             previous_ir = self.history.builds.get(latest_build)["ir"] if latest_build else None
+            references = []
+            if self.tools and self.tools.knowledge and target != "code":
+                _, references = self.tools.knowledge.context(messages[-1]["content"], target)
+                if references:
+                    emit({"type": "stage", "stage": "retrieving_docs"})
+                self.history.references(chat_id, assistant_id, references)
             observations = []
             read_results = set()
             repeated_reads = set()
@@ -589,9 +610,19 @@ class ChatService:
                     }
                 )
                 try:
+                    if decision.tool_name == "docs.search" and target in {"python", "n8n"}:
+                        decision.tool_arguments["target"] = target
                     result = await self.tools.call(
                         chat_id, decision.tool_name, decision.tool_arguments
                     )
+                    if decision.tool_name == "docs.search" and isinstance(result, dict):
+                        by_url = {r["url"]: r for r in references}
+                        for hit in result.get("results", []):
+                            by_url[hit["url"]] = {
+                                k: hit[k] for k in ("url", "family", "title", "sha256", "synced_at")
+                            }
+                        references = list(by_url.values())[:12]
+                        self.history.references(chat_id, assistant_id, references)
                     encoded = json.dumps(result, ensure_ascii=False)
                     bounded_result = result
                     if len(encoded) > 12000:

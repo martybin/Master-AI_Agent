@@ -1,4 +1,4 @@
-"""Dependency-free starting point, then customized with BisCode's code tools."""
+"""LangGraph starting point, customized with BisCode coding tools and retrieved docs."""
 
 import json
 
@@ -15,7 +15,7 @@ from urllib.request import Request, urlopen
 CONFIG = json.loads(Path(__file__).with_name("agent.json").read_text(encoding="utf-8"))
 
 
-def respond(message):
+def _respond(message):
     if not isinstance(message, str) or not message.strip() or len(message) > 12000:
         raise ValueError("message must contain 1-12000 characters")
     payload = {
@@ -38,6 +38,24 @@ def respond(message):
         return reply
     except (HTTPError, URLError, TimeoutError, KeyError, ValueError) as exc:
         raise RuntimeError("Ollama request failed; check the local model and service") from exc
+
+
+def respond(message):
+    from typing import TypedDict
+    from langgraph.graph import END, START, StateGraph
+
+    class State(TypedDict):
+        message: str
+        reply: str
+
+    def generate(state):
+        return {"reply": _respond(state["message"])}
+
+    graph = StateGraph(State)
+    graph.add_node("generate", generate)
+    graph.add_edge(START, "generate")
+    graph.add_edge("generate", END)
+    return graph.compile().invoke({"message": message})["reply"]
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -140,6 +158,7 @@ if __name__ == "__main__":
 def files(name, instruction, model, base_url):
     return {
         "agent.py": AGENT_SOURCE,
+        "requirements.txt": "langgraph>=1,<2\n",
         "agent.json": json.dumps(
             {"name": name, "instruction": instruction, "model": model, "ollama_base_url": base_url},
             ensure_ascii=False,
@@ -149,14 +168,16 @@ def files(name, instruction, model, base_url):
         "tests/test_agent.py": TEST_SOURCE,
         "README.md": f"""# {name}
 
-A standalone Python agent powered by Ollama. The starting template is stateless;
+A standalone LangGraph agent powered by Ollama. The initial one-node graph is stateless;
 implement and test additional capabilities in `agent.py`. Model instructions
 are stored in `agent.json` and can specify Persian or any supported language.
 
-Requires Python 3.11+ and a separately running Ollama instance. No third-party
-Python dependencies are needed for this template.
+Requires Python 3.11+, LangGraph, and a separately running Ollama instance.
+Extend the graph for requested tools/memory; use LangChain or LlamaIndex when
+the integration or document retrieval task needs them.
 
 ```bash
+python -m pip install -r requirements.txt
 python agent.py 'Hello'
 python agent.py --serve --port 8081
 python -m unittest discover -s tests -v

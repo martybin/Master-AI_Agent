@@ -22,6 +22,7 @@ from master_agent.clients import IntegrationError, N8nClient, OllamaClient
 from master_agent.compiler import compile_ir, digest
 from master_agent.config import Settings
 from master_agent.ir import ClosedModel, WorkflowIR
+from master_agent.knowledge.store import Knowledge
 from master_agent.local.bridge import Bridges
 from master_agent.local.connectors import Connectors
 from master_agent.local.native import NativeCatalog
@@ -134,7 +135,13 @@ def create_app(
             ollama = OllamaClient(cfg, client)
             n8n = N8nClient(cfg, client)
             app.state.ollama, app.state.n8n = ollama, n8n
-            app.state.planner = Planner(cfg, ollama)
+            knowledge = (
+                Knowledge(cfg.knowledge_path or cfg.database_path.parent / "knowledge.sqlite3")
+                if cfg.docs_enabled
+                else None
+            )
+            app.state.knowledge = knowledge
+            app.state.planner = Planner(cfg, ollama, knowledge)
             app.state.service = BuildService(repo, n8n)
             local_store = LocalStore(
                 repo, cfg.local_vault_key or cfg.database_path.parent / "vault.key"
@@ -144,7 +151,7 @@ def create_app(
             connectors = Connectors(local_store, client)
             catalog = NativeCatalog(local_store)
             catalog.initialize()
-            tools = Tools(local_store, cfg, connectors, catalog, n8n)
+            tools = Tools(local_store, cfg, connectors, catalog, n8n, knowledge=knowledge)
             tools.load_plugins(cfg.local_plugin_modules)
             bridges = Bridges(local_store, connectors, n8n, cfg, client)
             app.state.local_store, app.state.connectors = local_store, connectors
@@ -184,6 +191,30 @@ def create_app(
 
     web = Path(__file__).parent / "web"
     app.mount("/assets", RevalidatedStaticFiles(directory=web), name="assets")
+
+    @app.get("/api/v1/knowledge/status", dependencies=[Depends(authenticate)])
+    async def knowledge_status():
+        return app.state.knowledge.status() if app.state.knowledge else {"enabled": False}
+
+    @app.get("/api/v1/knowledge/search", dependencies=[Depends(authenticate)])
+    async def knowledge_search(query: str, target: Literal["python", "n8n"], limit: int = 4):
+        return {
+            "results": app.state.knowledge.search(query[:2000], target, limit)
+            if app.state.knowledge
+            else []
+        }
+
+    @app.post("/api/v1/knowledge/sync", dependencies=[Depends(authenticate)])
+    async def knowledge_sync(
+        family: Literal["langchain", "langgraph", "llamaindex", "n8n"] | None = None,
+    ):
+        if not app.state.knowledge:
+            raise HTTPException(409, "Documentation retrieval is disabled")
+        async with httpx.AsyncClient(trust_env=False, follow_redirects=False) as client:
+            try:
+                return await app.state.knowledge.sync(client, family)
+            except ValueError as exc:
+                raise HTTPException(409, str(exc)) from exc
 
     @app.get("/", include_in_schema=False)
     async def home():

@@ -288,7 +288,9 @@ def test_python_factory_real_files_checks_zip_and_idempotence(api, tmp_path):
     record = project(api, cid)
     root = Path(record["path"])
     assert root.is_relative_to(tmp_path) and (root / "agent.py").is_file()
-    assert len(record["files"]) == 5
+    assert len(record["files"]) == 6
+    assert "StateGraph" in (root / "agent.py").read_text()
+    assert "langgraph" in (root / "requirements.txt").read_text()
     # A repeated creation cannot wipe subsequent owner edits.
     read = call(api, cid, "files.read", {"path": str(root / "README.md")}).json()["result"]
     call(

@@ -4,6 +4,7 @@ import re
 
 READ_ONLY_TOOLS = frozenset(
     {
+        "docs.search",
         "system.inspect",
         "access.request",
         "project.inspect",

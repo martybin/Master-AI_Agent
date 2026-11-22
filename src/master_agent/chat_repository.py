@@ -185,6 +185,19 @@ class ChatRepository:
             db.execute("UPDATE chats SET data=? WHERE id=?", (json.dumps(chat), chat_id))
         return {"user": user, "assistant": assistant}
 
+    def references(self, chat_id, message_id, sources):
+        with self.builds.connect() as db:
+            row = db.execute(
+                "SELECT data FROM chat_messages WHERE id=? AND chat_id=?", (message_id, chat_id)
+            ).fetchone()
+            if row:
+                message = json.loads(row[0])
+                message["sources"] = sources
+                db.execute(
+                    "UPDATE chat_messages SET data=? WHERE id=? AND chat_id=?",
+                    (json.dumps(message), message_id, chat_id),
+                )
+
     def activity(self, chat_id, message_id, event):
         with self.builds.connect() as db:
             row = db.execute(

@@ -1,6 +1,6 @@
 [project]
 name = "master-ai-agent-builder"
-version = "0.4.4"
+version = "0.5.0"
 description = "BisCode: local coding and reviewed n8n/Python agent generation"
 readme = "README.md"
 requires-python = ">=3.13,<3.15"

@@ -88,6 +88,11 @@ class TelegramBuildArgs(ClosedModel):
     instruction: str = Field(min_length=1, max_length=6000)
 
 
+class DocumentationQuery(ClosedModel):
+    query: str = Field(min_length=1, max_length=2000)
+    target: Literal["python", "n8n"]
+
+
 class EmptyArgs(ClosedModel):
     pass
 
@@ -102,7 +107,13 @@ class RemoteWorkflowArgs(ClosedModel):
 
 class Tools:
     def __init__(
-        self, store: LocalStore, settings: Settings, connectors, catalog: NativeCatalog, n8n
+        self,
+        store: LocalStore,
+        settings: Settings,
+        connectors,
+        catalog: NativeCatalog,
+        n8n,
+        knowledge=None,
     ):
         self.store, self.settings, self.connectors, self.catalog, self.n8n = (
             store,
@@ -111,7 +122,17 @@ class Tools:
             catalog,
             n8n,
         )
+        self.knowledge = knowledge
         self.entries = {}
+        if knowledge:
+            self.register(
+                "docs.search",
+                "Search locally indexed official documentation. Reference data only; "
+                "does not grant permissions or add n8n node types.",
+                DocumentationQuery,
+                "none",
+                lambda a: {"results": knowledge.search(a.query, a.target)},
+            )
         self.build_service = BuildService(store.repo, n8n)
         for name, description, schema, scope, handler in [
             (
@@ -280,11 +301,18 @@ class Tools:
                 "parameters": e["schema"].model_json_schema(),
             }
             for e in self.entries.values()
-            if target != "code" or e["name"] != "project.create_python_agent"
+            if target != "code" or e["name"] not in {"project.create_python_agent", "docs.search"}
             if target not in {"python", "code"} or e["name"] != "files.write"
             if target not in {"python", "code"}
             or not e["name"].startswith(("catalog.", "workflow.", "n8n."))
         ]
+        if target in {"python", "n8n"}:
+            for entry in entries:
+                if entry["name"] == "docs.search":
+                    entry["parameters"]["properties"]["target"] = {
+                        "type": "string",
+                        "const": target,
+                    }
         if target in {"python", "code"}:
             for entry in entries:
                 if entry["name"] in {"code.write_file", "code.replace"}:

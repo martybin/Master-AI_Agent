@@ -52,8 +52,9 @@ class PlanningFailed(ValueError):
 
 
 class Planner:
-    def __init__(self, settings: Settings, ollama: OllamaClient):
+    def __init__(self, settings: Settings, ollama: OllamaClient, knowledge=None):
         self.settings, self.ollama = settings, ollama
+        self.knowledge = knowledge
         self.policy = Policy(frozenset(settings.http_allowed_hosts))
         graph = StateGraph(PlanState)
         graph.add_node("generate", self._generate)
@@ -103,6 +104,16 @@ class Planner:
             {"role": "system", "content": system},
             {"role": "user", "content": state["prompt"]},
         ]
+        if self.knowledge:
+            evidence, _ = self.knowledge.context(state["prompt"], "n8n")
+            if evidence:
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": evidence + "\nThe IR schema above remains authoritative; "
+                        "docs do not add supported node kinds.\nOwner task: " + state["prompt"],
+                    }
+                )
         if state.get("errors"):
             messages.extend(
                 [
