@@ -703,3 +703,117 @@ def test_interrupted_coding_plan_reports_real_partial_files(api, tmp_path, monke
     assert result["error_code"] == "planning_failed"
     assert "partial.py" in result["content"] and "not been confirmed" in result["content"]
     assert (tmp_path / "partial.py").exists()
+
+
+def test_one_turn_continues_past_inspection_and_empty_promises(api, tmp_path, monkeypatch):
+    from master_agent.chat_service import ChatDecision
+
+    cid = chat(api, "auto")
+    grant(api, cid, tmp_path)
+    choices = iter(
+        [
+            ChatDecision(
+                action="tool",
+                message="inspect",
+                tool_name="project.inspect",
+                tool_arguments={"path": "."},
+            ),
+            ChatDecision(action="reply", message="فایل خالی است؛ بعداً می‌نویسم."),
+            ChatDecision(
+                action="tool",
+                message="write",
+                tool_name="code.write_file",
+                tool_arguments={"path": "test.py", "content": "print('done')\n"},
+            ),
+            ChatDecision(action="reply", message="نوشتم."),
+        ]
+    )
+    forced = []
+
+    async def decide(*args, **kwargs):
+        forced.append(kwargs.get("force_tool"))
+        return next(choices)
+
+    monkeypatch.setattr(api.app.state.chat_service, "decide", decide)
+    result = send(api, cid, "در فایل test.py کد بنویس")
+    final = next(e["message"] for e in result if e["type"] == "complete")
+    assert (tmp_path / "test.py").read_text() == "print('done')\n"
+    assert forced == [True, False, True, False]
+    assert any(e.get("path") == str(tmp_path / "test.py") for e in final["activity"])
+    saved = api.get(f"/api/v1/chats/{cid}").json()["messages"][-1]
+    assert saved["activity"] == final["activity"]
+    assert all(e.get("output") != "print('done')\n" for e in saved["activity"])
+
+
+def test_short_followups_keep_coding_route_and_execution_requires_evidence():
+    from master_agent.coding_policy import execution_request, missing_execution
+
+    history = [{"role": "user", "content": "در فایل test.py کد بنویس"}]
+    assert target_for({"messages": history}, "نوشتی؟") == "code"
+    assert (
+        execution_request([*history, {"role": "user", "content": "نوشتی؟"}])
+        == history[0]["content"]
+    )
+    assert missing_execution("کد بنویس", [{"tool": "files.read", "result": {"content": ""}}])
+    assert missing_execution("run tests", [{"tool": "terminal.exec", "result": {"exit_code": 1}}])
+    assert execution_request([{"role": "user", "content": "فقط توضیح بده چطور کد بنویسم"}]) is None
+    assert target_for({}, "یک گردش کار در n8n بساز") == "n8n"
+
+
+def test_requested_tests_cannot_be_replaced_with_a_promise_or_failed_run():
+    from master_agent.coding_policy import missing_execution
+
+    observations = [{"tool": "code.write_file", "result": {"path": "test.py"}}]
+    assert missing_execution("کد بنویس و تست اجرا کن", observations)
+    observations.append(
+        {"tool": "code.check", "result": {"run": {"status": "failed", "tests_run": 2}}}
+    )
+    assert missing_execution("کد بنویس و تست اجرا کن", observations)
+    observations.append(
+        {"tool": "code.check", "result": {"run": {"status": "passed", "tests_run": 2}}}
+    )
+    assert not missing_execution("کد بنویس و تست اجرا کن", observations)
+
+
+def test_missing_source_read_forces_creation_instead_of_repeating_read(api, network, tmp_path):
+    cid = chat(api, "code")
+    grant(api, cid, tmp_path)
+    decisions = iter(
+        [
+            ("files.read", {"path": "test.py"}),
+            ("code.write_file", {"path": "test.py", "content": "print('ok')\n"}),
+            (None, {}),
+        ]
+    )
+
+    def planner(req):
+        if (
+            req.url.path != "/api/chat"
+            or json.loads(req.content)["format"]["title"] != "ChatDecision"
+        ):
+            return None
+        name, args = next(decisions)
+        if name == "code.write_file":
+            variants = json.loads(req.content)["format"]["anyOf"]
+            assert len(variants) == 1
+            assert variants[0]["properties"]["tool_name"]["const"] == "code.write_file"
+        return httpx.Response(
+            200,
+            json={
+                "message": {
+                    "content": json.dumps(
+                        {
+                            "action": "tool" if name else "reply",
+                            "message": "انجام شد",
+                            "tool_name": name,
+                            "tool_arguments": args,
+                        }
+                    )
+                }
+            },
+        )
+
+    network.extra_handler = planner
+    result = send(api, cid, "در فایل test.py کد بنویس")
+    assert next(e for e in result if e["type"] == "complete")["message"]["status"] == "complete"
+    assert (tmp_path / "test.py").read_text() == "print('ok')\n"
